@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from minimal_recon.services.footprint import check_username, validate_username
+from minimal_recon.services.footprint import SITES, check_username, validate_username
 
 
 class FakeClient:
@@ -25,7 +25,24 @@ def test_check_username_uses_registry_and_records_status():
 
     assert [result.found for result in results] == [True, False]
     assert [result.status_code for result in results] == [200, 404]
+    assert all(result.confidence == "low" for result in results)
+    assert all(result.checked_at for result in results)
     assert client.urls == ["https://one.test/alice", "https://two.test/alice"]
+
+
+def test_default_registry_contains_public_social_sites():
+    assert {
+        "github",
+        "instagram",
+        "reddit",
+        "x",
+        "tiktok",
+        "youtube",
+        "twitch",
+        "pinterest",
+        "medium",
+        "devto",
+    }.issubset(SITES)
 
 
 @pytest.mark.parametrize("username", ["", "bad user", "<script>", "a" * 40])

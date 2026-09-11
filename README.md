@@ -62,8 +62,12 @@ recon metadata .\sample.jpg
 Every command supports `--json` for scripting and pipeline integration.
 For `dns --json`, the response includes the raw records and a derived `summary`
 with nameservers, mail servers and conservative provider hints.
-Footprint checks use an explicit public-site registry and support `--delay` to
-space out requests; they do not bypass authentication or access controls.
+Footprint checks use an explicit public-site registry containing GitHub, Instagram,
+Reddit, X, TikTok, YouTube, Twitch, Pinterest, Medium and Dev.to. Results include
+the source URL, HTTP status, UTC timestamp and a confidence marker. They support
+`--delay` to space out requests and do not bypass authentication or access controls.
+A `200` response remains a low-confidence heuristic because some platforms show
+login pages, redirects or bot challenges for missing profiles.
 Metadata inspection is local-only and does not upload files anywhere.
 Email analysis does not verify mailbox existence or query breach databases; it only
 checks the address format and public MX records.
