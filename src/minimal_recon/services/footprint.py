@@ -1,6 +1,7 @@
 """Explicit, low-volume username footprint checks."""
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import re
 import time
 from typing import Dict, List, Optional
@@ -14,9 +15,22 @@ class FootprintResult:
     url: str
     found: bool
     status_code: Optional[int] = None
+    confidence: str = "unknown"
+    checked_at: str = ""
 
 
-SITES = {"github": "https://github.com/{username}"}
+SITES = {
+    "github": "https://github.com/{username}",
+    "instagram": "https://www.instagram.com/{username}/",
+    "reddit": "https://www.reddit.com/user/{username}/",
+    "x": "https://x.com/{username}",
+    "tiktok": "https://www.tiktok.com/@{username}",
+    "youtube": "https://www.youtube.com/@{username}",
+    "twitch": "https://www.twitch.tv/{username}",
+    "pinterest": "https://www.pinterest.com/{username}/",
+    "medium": "https://medium.com/@{username}",
+    "devto": "https://dev.to/{username}",
+}
 
 
 def validate_username(username: str) -> str:
@@ -41,12 +55,23 @@ def check_username(
     def collect(active_client: httpx.Client) -> None:
         for index, (site, template) in enumerate(registry.items()):
             url = template.format(username=username)
+            checked_at = datetime.now(timezone.utc).isoformat()
             try:
                 response = active_client.get(url)
             except httpx.HTTPError:
-                results.append(FootprintResult(site, url, False))
+                results.append(FootprintResult(site, url, False, confidence="unknown", checked_at=checked_at))
             else:
-                results.append(FootprintResult(site, url, response.status_code == 200, response.status_code))
+                found = response.status_code == 200
+                results.append(
+                    FootprintResult(
+                        site,
+                        url,
+                        found,
+                        response.status_code,
+                        "low",
+                        checked_at,
+                    )
+                )
             if delay_seconds > 0 and index < len(registry) - 1:
                 time.sleep(delay_seconds)
 
