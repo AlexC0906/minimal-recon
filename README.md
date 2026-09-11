@@ -1,5 +1,7 @@
 # Minimal Recon
 
+[![CI](https://github.com/AlexC0906/minimal-recon/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexC0906/minimal-recon/actions/workflows/ci.yml)
+
 Minimal Recon is a modular, read-only OSINT command-line utility written in Python.
 It is designed as a portfolio project with small services that can be extended without
 coupling the CLI to network or file-system logic.
@@ -9,7 +11,8 @@ coupling the CLI to network or file-system logic.
 - `lookup`: basic IP/domain resolution and reverse DNS
 - `dns`: common DNS record enumeration (`A`, `AAAA`, `MX`, `NS`, `TXT`, `CNAME`)
 - `footprint`: low-volume username checks against an explicit public-site registry
-- `metadata`: local file metadata extraction
+- `email`: email format validation and public MX record analysis
+- `metadata`: local filesystem metadata plus image dimensions and readable EXIF fields
 
 ## Setup
 
@@ -17,6 +20,30 @@ coupling the CLI to network or file-system logic.
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
+```
+
+## Testare locală
+
+Rulează testele automate:
+
+```powershell
+python -m pytest
+```
+
+Testează comenzile fără requesturi externe:
+
+```powershell
+python -m minimal_recon.cli --help
+python -m minimal_recon.cli lookup 192.0.2.10 --json
+python -m minimal_recon.cli metadata pyproject.toml --json
+```
+
+Pentru funcțiile care interoghează rețeaua, folosește doar ținte autorizate:
+
+```powershell
+python -m minimal_recon.cli lookup example.com --json
+python -m minimal_recon.cli dns example.com --json
+python -m minimal_recon.cli footprint octocat --delay 0.5 --json
 ```
 
 ## Usage
@@ -28,6 +55,7 @@ recon lookup example.com --json
 recon dns example.com
 recon footprint octocat
 recon footprint octocat --delay 0.5 --json
+python -m minimal_recon.cli email analyst@example.com --json
 recon metadata .\sample.jpg
 ```
 
@@ -36,6 +64,9 @@ For `dns --json`, the response includes the raw records and a derived `summary`
 with nameservers, mail servers and conservative provider hints.
 Footprint checks use an explicit public-site registry and support `--delay` to
 space out requests; they do not bypass authentication or access controls.
+Metadata inspection is local-only and does not upload files anywhere.
+Email analysis does not verify mailbox existence or query breach databases; it only
+checks the address format and public MX records.
 
 ## Roadmap
 
