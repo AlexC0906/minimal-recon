@@ -64,7 +64,7 @@ def test_footprint_rejects_invalid_username():
     result = runner.invoke(cli.app, ["footprint", "bad user"])
 
     assert result.exit_code == 1
-    assert "username must be" in result.stdout
+    assert "username must be" in result.output
 
 
 def test_footprint_text_output_shows_status_and_full_url(monkeypatch):
