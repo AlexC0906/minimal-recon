@@ -37,3 +37,17 @@ def test_build_report_aggregates_passive_checks(monkeypatch):
     assert result["dns"]["records"] == {"A": ["192.0.2.10"]}
     assert result["username_footprint"] == ["alice"]
     assert result["email"] == {"email": "alice@example.test"}
+
+
+def test_build_report_keeps_other_sections_when_one_check_fails(monkeypatch):
+    monkeypatch.setattr(report, "lookup_target", lambda domain: {"target": domain})
+    monkeypatch.setattr(report, "enumerate_dns", lambda domain: {"A": []})
+    monkeypatch.setattr(report, "summarize_dns", lambda records: {})
+    monkeypatch.setattr(report, "enumerate_subdomains", lambda domain: {"subdomains": []})
+    monkeypatch.setattr(report, "check_web", lambda url: (_ for _ in ()).throw(OSError("timeout")))
+
+    result = report.build_report("example.test")
+
+    assert result["web"] == {"status": "error", "error": "timeout"}
+    assert result["lookup"] == {"target": "example.test"}
+    assert result["subdomains"] == {"subdomains": []}
