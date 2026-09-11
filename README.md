@@ -24,10 +24,21 @@ python -m pip install -e ".[dev]"
 ```powershell
 recon --help
 recon lookup example.com
+recon lookup example.com --json
 recon dns example.com
 recon footprint octocat
 recon metadata .\sample.jpg
 ```
+
+Every command supports `--json` for scripting and pipeline integration.
+
+## Roadmap
+
+1. Stabilize the core services with validation, timeouts and mock-based tests.
+2. Add richer DNS analysis, including nameserver and mail-provider summaries.
+3. Add configurable public username and email checks with rate limiting.
+4. Add export formats and a small plugin interface for new OSINT collectors.
+5. Add CI checks for tests, type checking and packaging.
 
 Only use this tool against systems, domains, files and identities you are authorized
 to investigate. The first version intentionally avoids brute force, stealth and
