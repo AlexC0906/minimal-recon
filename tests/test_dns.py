@@ -1,6 +1,6 @@
 import pytest
 
-from minimal_recon.services.dns import enumerate_dns, normalize_domain
+from minimal_recon.services.dns import enumerate_dns, normalize_domain, summarize_dns
 
 
 class FakeAnswer:
@@ -33,6 +33,20 @@ def test_enumerate_dns_uses_injected_resolver():
         "A": ["192.0.2.10"],
         "MX": ["10 mail.example.test."],
     }
+
+
+def test_summarize_dns_extracts_servers_and_provider_hints():
+    result = summarize_dns(
+        {
+            "NS": ["ns1.cloudflare.com."],
+            "MX": ["10 aspmx.l.google.com."],
+        }
+    )
+
+    assert result["nameservers"] == ["ns1.cloudflare.com"]
+    assert result["mail_servers"] == ["aspmx.l.google.com"]
+    assert result["nameserver_providers"] == ["Cloudflare"]
+    assert result["mail_providers"] == ["Google"]
 
 
 @pytest.mark.parametrize("domain", ["", "example test", "example..test"])

@@ -7,7 +7,7 @@ from typing import Any
 
 import typer
 
-from minimal_recon.services.dns import enumerate_dns
+from minimal_recon.services.dns import enumerate_dns, summarize_dns
 from minimal_recon.services.footprint import check_username
 from minimal_recon.services.lookup import lookup_target
 from minimal_recon.services.metadata import extract_metadata
@@ -58,7 +58,7 @@ def dns_enumeration(domain: str, as_json: bool = typer.Option(False, "--json")) 
     except (OSError, ValueError) as error:
         handle_error(error)
     if as_json:
-        emit(records, as_json=True)
+        emit({"domain": domain, "records": records, "summary": summarize_dns(records)}, as_json=True)
         return
     for record_type, values in records.items():
         for value in values:
