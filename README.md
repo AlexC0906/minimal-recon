@@ -31,6 +31,8 @@ recon metadata .\sample.jpg
 ```
 
 Every command supports `--json` for scripting and pipeline integration.
+For `dns --json`, the response includes the raw records and a derived `summary`
+with nameservers, mail servers and conservative provider hints.
 
 ## Roadmap
 

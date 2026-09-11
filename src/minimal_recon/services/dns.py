@@ -32,3 +32,38 @@ def enumerate_dns(
             continue
         results[record_type] = [answer.to_text() for answer in answers]
     return results
+
+
+def summarize_dns(records: Dict[str, List[str]]) -> Dict[str, object]:
+    """Derive useful provider hints from already collected DNS records."""
+    nameservers = [value.rstrip(".") for value in records.get("NS", [])]
+    mail_servers = []
+    for value in records.get("MX", []):
+        parts = value.split()
+        if parts:
+            mail_servers.append(parts[-1].rstrip("."))
+
+    return {
+        "nameservers": nameservers,
+        "mail_servers": mail_servers,
+        "nameserver_providers": sorted({_provider_hint(name) for name in nameservers}),
+        "mail_providers": sorted({_provider_hint(name) for name in mail_servers}),
+    }
+
+
+def _provider_hint(hostname: str) -> str:
+    """Return a conservative provider hint from a DNS hostname."""
+    known_providers = {
+        "cloudflare": "Cloudflare",
+        "google": "Google",
+        "amazon": "Amazon",
+        "aws": "Amazon",
+        "microsoft": "Microsoft",
+        "outlook": "Microsoft",
+        "protection.outlook": "Microsoft",
+    }
+    lowered = hostname.lower()
+    for marker, provider in known_providers.items():
+        if marker in lowered:
+            return provider
+    return "Unknown"
