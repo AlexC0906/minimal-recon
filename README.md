@@ -25,15 +25,15 @@ python -m venv .venv
 python -m pip install -e ".[dev]"
 ```
 
-## Testare locală
+## Local Testing
 
-Rulează testele automate:
+Run the automated tests:
 
 ```powershell
 python -m pytest
 ```
 
-Testează comenzile fără requesturi externe:
+Test commands without external requests:
 
 ```powershell
 python -m minimal_recon.cli --help
@@ -41,7 +41,7 @@ python -m minimal_recon.cli lookup 192.0.2.10 --json
 python -m minimal_recon.cli metadata pyproject.toml --json
 ```
 
-Pentru funcțiile care interoghează rețeaua, folosește doar ținte autorizate:
+For network-backed commands, use only authorized targets:
 
 ```powershell
 python -m minimal_recon.cli lookup example.com --json
@@ -73,9 +73,9 @@ Footprint checks use an explicit public-site registry containing GitHub, Instagr
 Reddit, X, TikTok, YouTube, Twitch, Pinterest, Medium and Dev.to. Results include
 the source URL, HTTP status, UTC timestamp and an explicit match basis. They support
 `--delay` to space out requests and do not bypass authentication or access controls.
-A `200` response is marked as `http_status_200_heuristic` because some platforms
-show login pages, redirects or bot challenges for missing profiles. It is not proof
-that a profile belongs to a specific person.
+A `200` response is not enough to prove that a profile exists. Results are classified
+as `FOUND`, `NOT FOUND` or `UNKNOWN`; platform challenges and generic pages are kept
+as `UNKNOWN`.
 Metadata inspection is local-only and does not upload files anywhere.
 Email analysis does not verify mailbox existence or query breach databases; it only
 checks the address format and public MX records.
