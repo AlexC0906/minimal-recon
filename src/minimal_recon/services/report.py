@@ -21,20 +21,34 @@ def build_report(
     email: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Collect a read-only report for a domain and optional public identifiers."""
-    records = enumerate_dns(domain)
     report: Dict[str, Any] = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "target": domain,
-        "lookup": _serialize(lookup_target(domain)),
-        "dns": {"records": records, "summary": summarize_dns(records)},
-        "subdomains": _serialize(enumerate_subdomains(domain)),
-        "web": _serialize(check_web(f"https://{domain}")),
+        "lookup": _safe_call(lambda: _serialize(lookup_target(domain))),
+        "dns": _safe_call(lambda: _collect_dns(domain)),
+        "subdomains": _safe_call(lambda: _serialize(enumerate_subdomains(domain))),
+        "web": _safe_call(lambda: _serialize(check_web(f"https://{domain}"))),
     }
     if username:
-        report["username_footprint"] = _serialize(check_username(username, delay_seconds=0.2))
+        report["username_footprint"] = _safe_call(
+            lambda: _serialize(check_username(username, delay_seconds=0.2))
+        )
     if email:
-        report["email"] = _serialize(analyze_email(email))
+        report["email"] = _safe_call(lambda: _serialize(analyze_email(email)))
     return report
+
+
+def _collect_dns(domain: str) -> Dict[str, Any]:
+    records = enumerate_dns(domain)
+    return {"records": records, "summary": summarize_dns(records)}
+
+
+def _safe_call(operation: Any) -> Any:
+    """Return an error object instead of aborting the entire report."""
+    try:
+        return operation()
+    except Exception as error:
+        return {"status": "error", "error": str(error)}
 
 
 def render_html(report: Dict[str, Any]) -> str:
