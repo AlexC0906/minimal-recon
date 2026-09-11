@@ -8,6 +8,7 @@ from typing import Any
 import typer
 
 from minimal_recon.services.dns import enumerate_dns, summarize_dns
+from minimal_recon.services.email import analyze_email
 from minimal_recon.services.footprint import check_username
 from minimal_recon.services.lookup import lookup_target
 from minimal_recon.services.metadata import extract_metadata
@@ -82,6 +83,23 @@ def footprint(
     for result in results:
         status = "found" if result.found else "not found"
         typer.echo(f"{result.site}: {status} ({result.url})")
+
+
+@app.command("email")
+def email_analysis(address: str, as_json: bool = typer.Option(False, "--json")) -> None:
+    """Validate an email and inspect its public MX records."""
+    try:
+        result = analyze_email(address)
+    except ValueError as error:
+        handle_error(error)
+    if as_json:
+        emit(result, as_json=True)
+        return
+    typer.echo(f"Email: {result.email}")
+    typer.echo(f"Domain: {result.domain}")
+    typer.echo(f"Valid format: {result.valid}")
+    for record in result.mx_records:
+        typer.echo(f"MX: {record}")
 
 
 @app.command()
