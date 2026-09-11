@@ -15,7 +15,8 @@ class FootprintResult:
     url: str
     found: bool
     status_code: Optional[int] = None
-    confidence: str = "unknown"
+    match_basis: str = "request_error"
+    state: str = "unknown"
     checked_at: str = ""
 
 
@@ -31,6 +32,19 @@ SITES = {
     "medium": "https://medium.com/@{username}",
     "devto": "https://dev.to/{username}",
 }
+
+NOT_FOUND_MARKERS = (
+    "page not found",
+    "profile not found",
+    "user not found",
+    "couldn't find",
+    "doesn't exist",
+    "does not exist",
+    "this page isn't available",
+    "channel doesn't exist",
+)
+
+CHALLENGE_MARKERS = ("js_challenge", "consent.youtube.com")
 
 
 def validate_username(username: str) -> str:
@@ -59,16 +73,40 @@ def check_username(
             try:
                 response = active_client.get(url)
             except httpx.HTTPError:
-                results.append(FootprintResult(site, url, False, confidence="unknown", checked_at=checked_at))
+                results.append(
+                    FootprintResult(
+                        site, url, False, match_basis="request_error", state="unknown", checked_at=checked_at
+                    )
+                )
             else:
-                found = response.status_code == 200
+                body = response.text.lower()
+                has_not_found_marker = any(marker in body for marker in NOT_FOUND_MARKERS)
+                has_challenge_marker = any(marker in body or marker in str(response.url).lower() for marker in CHALLENGE_MARKERS)
+                has_profile_signal = username.lower() in body
+                found = response.status_code == 200 and has_profile_signal and not has_not_found_marker and not has_challenge_marker
+                if found:
+                    match_basis = "profile_content_signal"
+                    state = "found"
+                elif response.status_code == 404 or has_not_found_marker:
+                    match_basis = f"http_status_{response.status_code}"
+                    state = "not_found"
+                elif has_challenge_marker:
+                    match_basis = "platform_challenge_or_consent"
+                    state = "unknown"
+                elif response.status_code == 200 and not has_not_found_marker:
+                    match_basis = "http_status_200_no_profile_signal"
+                    state = "unknown"
+                else:
+                    match_basis = f"http_status_{response.status_code}"
+                    state = "unknown"
                 results.append(
                     FootprintResult(
                         site,
                         url,
                         found,
                         response.status_code,
-                        "low",
+                        match_basis,
+                        state,
                         checked_at,
                     )
                 )

@@ -1,0 +1,66 @@
+"""Aggregate authorized OSINT checks into portable JSON or HTML reports."""
+
+from dataclasses import asdict, is_dataclass
+from datetime import datetime, timezone
+import html
+import json
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+from minimal_recon.services.dns import enumerate_dns, summarize_dns
+from minimal_recon.services.email import analyze_email
+from minimal_recon.services.footprint import check_username
+from minimal_recon.services.lookup import lookup_target
+from minimal_recon.services.subdomains import enumerate_subdomains
+from minimal_recon.services.web import check_web
+
+
+def build_report(
+    domain: str,
+    username: Optional[str] = None,
+    email: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Collect a read-only report for a domain and optional public identifiers."""
+    records = enumerate_dns(domain)
+    report: Dict[str, Any] = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "target": domain,
+        "lookup": _serialize(lookup_target(domain)),
+        "dns": {"records": records, "summary": summarize_dns(records)},
+        "subdomains": _serialize(enumerate_subdomains(domain)),
+        "web": _serialize(check_web(f"https://{domain}")),
+    }
+    if username:
+        report["username_footprint"] = _serialize(check_username(username, delay_seconds=0.2))
+    if email:
+        report["email"] = _serialize(analyze_email(email))
+    return report
+
+
+def render_html(report: Dict[str, Any]) -> str:
+    """Render a dependency-free, escaped HTML report."""
+    title = html.escape(f"Minimal Recon report: {report['target']}")
+    body = html.escape(json.dumps(report, indent=2, sort_keys=True))
+    return (
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+        f"<title>{title}</title><style>body{{font:15px monospace;max-width:1100px;"
+        "margin:2rem auto;padding:0 1rem}}pre{white-space:pre-wrap;line-height:1.5}"
+        "</style></head><body><h1>Minimal Recon</h1>"
+        f"<h2>{title}</h2><pre>{body}</pre></body></html>"
+    )
+
+
+def write_report(report: Dict[str, Any], output: Optional[Path] = None, html_output: Optional[Path] = None) -> None:
+    """Write selected report formats to disk."""
+    if output:
+        output.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    if html_output:
+        html_output.write_text(render_html(report), encoding="utf-8")
+
+
+def _serialize(value: Any) -> Any:
+    if is_dataclass(value):
+        return asdict(value)
+    if isinstance(value, list):
+        return [_serialize(item) for item in value]
+    return value

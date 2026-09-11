@@ -4,6 +4,7 @@ from typer.testing import CliRunner
 
 from minimal_recon import cli
 from minimal_recon.services.email import EmailResult
+from minimal_recon.services.footprint import FootprintResult
 from minimal_recon.services.lookup import LookupResult
 
 
@@ -64,3 +65,25 @@ def test_footprint_rejects_invalid_username():
 
     assert result.exit_code == 1
     assert "username must be" in result.stdout
+
+
+def test_footprint_text_output_shows_status_and_full_url(monkeypatch):
+    monkeypatch.setattr(
+        cli,
+        "check_username",
+        lambda username, delay_seconds: [
+            FootprintResult(
+                "instagram",
+                "https://www.instagram.com/alice/",
+                True,
+                200,
+                "profile_content_signal",
+                "found",
+            )
+        ],
+    )
+
+    result = runner.invoke(cli.app, ["footprint", "alice"])
+
+    assert result.exit_code == 0
+    assert "instagram: FOUND https://www.instagram.com/alice/" in result.stdout

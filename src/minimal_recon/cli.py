@@ -12,6 +12,9 @@ from minimal_recon.services.email import analyze_email
 from minimal_recon.services.footprint import check_username
 from minimal_recon.services.lookup import lookup_target
 from minimal_recon.services.metadata import extract_metadata
+from minimal_recon.services.web import check_web
+from minimal_recon.services.subdomains import enumerate_subdomains
+from minimal_recon.services.report import build_report, write_report
 
 app = typer.Typer(help="Read-only OSINT reconnaissance utilities.")
 
@@ -81,8 +84,12 @@ def footprint(
         emit([asdict(result) for result in results], as_json=True)
         return
     for result in results:
-        status = "found" if result.found else "not found"
-        typer.echo(f"{result.site}: {status} ({result.url})")
+        status = {
+            "found": "FOUND",
+            "not_found": "NOT FOUND",
+            "unknown": "UNKNOWN",
+        }[result.state]
+        typer.echo(f"{result.site}: {status} {result.url}")
 
 
 @app.command("email")
@@ -100,6 +107,63 @@ def email_analysis(address: str, as_json: bool = typer.Option(False, "--json")) 
     typer.echo(f"Valid format: {result.valid}")
     for record in result.mx_records:
         typer.echo(f"MX: {record}")
+
+
+@app.command("web")
+def web_check(url: str, as_json: bool = typer.Option(False, "--json")) -> None:
+    """Passively inspect public web security headers."""
+    try:
+        result = check_web(url)
+    except (OSError, ValueError) as error:
+        handle_error(error)
+    if as_json:
+        emit(result, as_json=True)
+        return
+    typer.echo(f"URL: {result.url}")
+    typer.echo(f"Final URL: {result.final_url}")
+    typer.echo(f"Status: {result.status_code}")
+    for name, value in result.security_headers.items():
+        typer.echo(f"{name}: {value}")
+    typer.echo(f"Missing headers: {', '.join(result.missing_security_headers) or 'none'}")
+
+
+@app.command("subdomains")
+def subdomain_enumeration(domain: str, as_json: bool = typer.Option(False, "--json")) -> None:
+    """Discover public in-scope subdomains from certificate logs."""
+    try:
+        result = enumerate_subdomains(domain)
+    except (OSError, ValueError) as error:
+        handle_error(error)
+    if as_json:
+        emit(result, as_json=True)
+        return
+    typer.echo(f"Domain: {result.domain}")
+    typer.echo(f"Source: {result.source}")
+    for subdomain in result.subdomains:
+        typer.echo(subdomain)
+
+
+@app.command("report")
+def report_command(
+    domain: str,
+    username: str = typer.Option("", "--username"),
+    email: str = typer.Option("", "--email"),
+    output: Path = typer.Option(None, "--output", help="Write a JSON report to this path."),
+    html_output: Path = typer.Option(None, "--html", help="Write an HTML report to this path."),
+) -> None:
+    """Build a consolidated passive OSINT report."""
+    try:
+        result = build_report(domain, username or None, email or None)
+        write_report(result, output, html_output)
+    except (OSError, ValueError) as error:
+        handle_error(error)
+    if not output and not html_output:
+        typer.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        if output:
+            typer.echo(f"JSON report: {output}")
+        if html_output:
+            typer.echo(f"HTML report: {html_output}")
 
 
 @app.command()
