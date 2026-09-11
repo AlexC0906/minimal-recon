@@ -66,9 +66,16 @@ def dns_enumeration(domain: str, as_json: bool = typer.Option(False, "--json")) 
 
 
 @app.command()
-def footprint(username: str, as_json: bool = typer.Option(False, "--json")) -> None:
+def footprint(
+    username: str,
+    as_json: bool = typer.Option(False, "--json"),
+    delay: float = typer.Option(0.2, "--delay", min=0, help="Seconds between site requests."),
+) -> None:
     """Check a username against a small, explicit public-site registry."""
-    results = check_username(username)
+    try:
+        results = check_username(username, delay_seconds=delay)
+    except ValueError as error:
+        handle_error(error)
     if as_json:
         emit([asdict(result) for result in results], as_json=True)
         return

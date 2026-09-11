@@ -27,12 +27,15 @@ recon lookup example.com
 recon lookup example.com --json
 recon dns example.com
 recon footprint octocat
+recon footprint octocat --delay 0.5 --json
 recon metadata .\sample.jpg
 ```
 
 Every command supports `--json` for scripting and pipeline integration.
 For `dns --json`, the response includes the raw records and a derived `summary`
 with nameservers, mail servers and conservative provider hints.
+Footprint checks use an explicit public-site registry and support `--delay` to
+space out requests; they do not bypass authentication or access controls.
 
 ## Roadmap
 
