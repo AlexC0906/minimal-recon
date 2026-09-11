@@ -24,5 +24,8 @@ def lookup_target(target: str) -> LookupResult:
         )
         return LookupResult(target, "domain", addresses)
 
-    reverse_name = socket.gethostbyaddr(str(address))[0]
+    try:
+        reverse_name = socket.gethostbyaddr(str(address))[0]
+    except (OSError, socket.herror, socket.gaierror):
+        reverse_name = None
     return LookupResult(target, "IPv4" if address.version == 4 else "IPv6", (target,), reverse_name)
