@@ -22,6 +22,7 @@ coupling the CLI to network or file-system logic.
 - `verify`: explicit proof-of-control verification for supplied profile URLs
 - `reputation`: optional read-only VirusTotal IP/domain reputation lookup
 - `tls`: read-only TLS version and certificate inspection
+- `web`: passive security headers and WAF fingerprint detection
 
 ## Setup
 
@@ -105,6 +106,8 @@ Archive history uses the public Wayback CDX index and returns snapshot links; it
 not download archived pages.
 TLS checks connect only to the requested host and port, report the negotiated protocol,
 cipher and certificate dates, and do not scan other ports.
+WAF detection is passive and heuristic: it uses response headers and public response
+markers, so `not_detected` does not prove that a site has no WAF.
 Ownership verification is opt-in: generate a token, publish it temporarily on each
 profile you control, then pass those exact URLs to `verify`. It does not discover or
 link accounts automatically.
