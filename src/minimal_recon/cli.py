@@ -23,6 +23,7 @@ from minimal_recon.services.archive import enumerate_archive
 from minimal_recon.services.verification import create_token, verify_urls
 from minimal_recon.services.threatintel import check_reputation
 from minimal_recon.services.tls import inspect_tls
+from minimal_recon.services.shodan import lookup_host
 
 app = typer.Typer(help="Read-only OSINT reconnaissance utilities.")
 
@@ -197,6 +198,27 @@ def tls_check(
     typer.echo(f"Issuer: {result.issuer}")
     typer.echo(f"Expires: {result.not_after or 'unknown'}")
     typer.echo(f"Days until expiry: {result.days_until_expiry}")
+
+
+@app.command("shodan")
+def shodan_lookup(ip: str, as_json: bool = typer.Option(False, "--json")) -> None:
+    """Read Shodan's indexed host data for one IP address."""
+    try:
+        result = lookup_host(ip)
+    except (httpx.HTTPError, OSError, ValueError) as error:
+        handle_error(error)
+    if as_json:
+        emit(result, as_json=True)
+        return
+    typer.echo(f"IP: {result.ip}")
+    typer.echo(f"Organization: {result.organization or 'unknown'}")
+    typer.echo(f"ISP: {result.isp or 'unknown'}")
+    typer.echo(f"ASN: {result.asn or 'unknown'}")
+    typer.echo(f"Location: {result.city or 'unknown'}, {result.country or 'unknown'}")
+    typer.echo(f"Hostnames: {', '.join(result.hostnames) or 'none'}")
+    typer.echo(f"Indexed ports: {', '.join(map(str, result.ports)) or 'none'}")
+    typer.echo(f"Domains: {', '.join(result.domains) or 'none'}")
+    typer.echo(f"Last update: {result.last_update or 'unknown'}")
 
 
 @app.command()

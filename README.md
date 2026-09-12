@@ -21,6 +21,7 @@ coupling the CLI to network or file-system logic.
 - `archive`: public website history from the Wayback Machine
 - `verify`: explicit proof-of-control verification for supplied profile URLs
 - `reputation`: optional read-only VirusTotal IP/domain reputation lookup
+- `shodan`: optional read-only Shodan indexed host lookup
 - `tls`: read-only TLS version and certificate inspection
 - `web`: passive security headers and WAF fingerprint detection
 
@@ -120,6 +121,15 @@ $env:VT_API_KEY = "your-api-key"
 recon reputation example.com --json
 recon reputation 1.1.1.1 --json
 ```
+
+Shodan lookups are also optional and require a user-provided API key:
+
+```powershell
+$env:SHODAN_API_KEY = "your-api-key"
+recon shodan 1.1.1.1 --json
+```
+
+The integration reads Shodan's existing indexed data only; it does not launch scans.
 
 ```powershell
 recon verify-token
