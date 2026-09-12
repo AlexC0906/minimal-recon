@@ -26,6 +26,7 @@ coupling the CLI to network or file-system logic.
 - `links`: single-page surface link extraction without recursive crawling
 - `anti-spoofing`: public SPF, DMARC and selected DKIM policy analysis
 - `public-files`: checks intentionally public standard web documents
+- `web`: passive security headers, WAF and technology fingerprint detection
 - `web`: passive security headers and WAF fingerprint detection
 
 ## Setup
@@ -113,6 +114,8 @@ TLS checks connect only to the requested host and port, report the negotiated pr
 cipher and certificate dates, and do not scan other ports.
 WAF detection is passive and heuristic: it uses response headers and public response
 markers, so `not_detected` does not prove that a site has no WAF.
+Technology detection is also heuristic and reports only public fingerprints such as
+response headers, meta/script paths and framework markers.
 Link extraction reads one HTML page, removes fragments, separates internal and
 external HTTP(S) links, and never follows the discovered links automatically.
 Anti-spoofing checks inspect DNS records only. DKIM requires known selectors, which

@@ -27,6 +27,7 @@ class WebCheckResult:
     waf_vendor: Optional[str]
     waf_signals: tuple[str, ...]
     waf_confidence: str
+    technologies: Dict[str, tuple[str, ...]]
 
 
 def validate_url(url: str) -> str:
@@ -51,6 +52,7 @@ def check_web(url: str, client: Optional[httpx.Client] = None) -> WebCheckResult
         }
         missing = tuple(name for name in SECURITY_HEADERS if name not in headers)
         waf_vendor, waf_signals, waf_confidence = detect_waf(response.headers, response.text)
+        technologies = detect_technologies(response.headers, response.text)
         return WebCheckResult(
             url,
             str(response.url),
@@ -60,6 +62,7 @@ def check_web(url: str, client: Optional[httpx.Client] = None) -> WebCheckResult
             waf_vendor,
             waf_signals,
             waf_confidence,
+            technologies,
         )
 
     if client is not None:
@@ -89,3 +92,34 @@ def detect_waf(headers: httpx.Headers, body: str = "") -> tuple[Optional[str], t
         if signals:
             return vendor, signals, "heuristic"
     return None, (), "not_detected"
+
+
+def detect_technologies(headers: httpx.Headers, body: str = "") -> Dict[str, tuple[str, ...]]:
+    """Infer technology hints from public headers and HTML fingerprints."""
+    normalized_headers = {key.lower(): value.lower() for key, value in headers.items()}
+    normalized_body = body.lower()[:500_000]
+    fingerprints = {
+        "WordPress": ("/wp-content/", "wp-includes", "wordpress"),
+        "Drupal": ("drupal-settings-json", "sites/default/files", "drupal"),
+        "Joomla": ("/media/system/js/", "joomla"),
+        "React": ("data-reactroot", "react.production.min.js", "__next_data__"),
+        "Next.js": ("/_next/", "__next_data__"),
+        "Vue": ("vue.min.js", "data-v-"),
+        "jQuery": ("jquery.min.js", "jquery-"),
+        "PHP": ("x-powered-by: php",),
+    }
+    detected: Dict[str, tuple[str, ...]] = {}
+    for technology, markers in fingerprints.items():
+        signals = tuple(
+            marker
+            for marker in markers
+            if (marker in normalized_body)
+            or any(marker in key or marker in value for key, value in normalized_headers.items())
+        )
+        if signals:
+            detected[technology] = signals
+    if "server" in normalized_headers:
+        detected["Server"] = (normalized_headers["server"],)
+    if "x-powered-by" in normalized_headers:
+        detected["X-Powered-By"] = (normalized_headers["x-powered-by"],)
+    return detected
