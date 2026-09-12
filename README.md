@@ -23,6 +23,7 @@ coupling the CLI to network or file-system logic.
 - `reputation`: optional read-only VirusTotal IP/domain reputation lookup
 - `shodan`: optional read-only Shodan indexed host lookup
 - `tls`: read-only TLS version and certificate inspection
+- `links`: single-page surface link extraction without recursive crawling
 - `web`: passive security headers and WAF fingerprint detection
 
 ## Setup
@@ -61,6 +62,7 @@ python -m minimal_recon.cli whois example.com --json
 python -m minimal_recon.cli geoip 1.1.1.1 --json
 python -m minimal_recon.cli archive example.com --json
 python -m minimal_recon.cli tls example.com --json
+python -m minimal_recon.cli links https://example.com --max-links 100 --json
 python -m minimal_recon.cli report example.com --username alex576_ --output audit.json --html audit.html
 ```
 
@@ -109,6 +111,8 @@ TLS checks connect only to the requested host and port, report the negotiated pr
 cipher and certificate dates, and do not scan other ports.
 WAF detection is passive and heuristic: it uses response headers and public response
 markers, so `not_detected` does not prove that a site has no WAF.
+Link extraction reads one HTML page, removes fragments, separates internal and
+external HTTP(S) links, and never follows the discovered links automatically.
 Ownership verification is opt-in: generate a token, publish it temporarily on each
 profile you control, then pass those exact URLs to `verify`. It does not discover or
 link accounts automatically.
