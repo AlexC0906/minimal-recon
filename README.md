@@ -19,6 +19,7 @@ coupling the CLI to network or file-system logic.
 - `whois`: public RDAP registration, registrar, dates and nameservers
 - `geoip`: approximate IP location and network ownership information
 - `archive`: public website history from the Wayback Machine
+- `verify`: explicit proof-of-control verification for supplied profile URLs
 
 ## Setup
 
@@ -99,6 +100,14 @@ IP geolocation is approximate and usually identifies the network, CDN or hosting
 provider rather than a precise physical location.
 Archive history uses the public Wayback CDX index and returns snapshot links; it does
 not download archived pages.
+Ownership verification is opt-in: generate a token, publish it temporarily on each
+profile you control, then pass those exact URLs to `verify`. It does not discover or
+link accounts automatically.
+
+```powershell
+recon verify-token
+recon verify --token minimal-recon-verify-... --url https://github.com/your-user --url https://www.instagram.com/your-user --json
+```
 
 ## Roadmap
 

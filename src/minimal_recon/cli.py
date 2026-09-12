@@ -19,6 +19,7 @@ from minimal_recon.services.report import build_report, write_report
 from minimal_recon.services.whois import lookup_whois
 from minimal_recon.services.geoip import geolocate_ip
 from minimal_recon.services.archive import enumerate_archive
+from minimal_recon.services.verification import create_token, verify_urls
 
 app = typer.Typer(help="Read-only OSINT reconnaissance utilities.")
 
@@ -125,6 +126,31 @@ def archive_history(domain: str, as_json: bool = typer.Option(False, "--json")) 
     typer.echo(f"Source: {result.source}")
     for snapshot in result.snapshots:
         typer.echo(f"{snapshot.timestamp} {snapshot.original_url} {snapshot.archive_url}")
+
+
+@app.command("verify-token")
+def verification_token() -> None:
+    """Generate a token for explicit public profile ownership verification."""
+    typer.echo(create_token())
+
+
+@app.command("verify")
+def verify_profiles(
+    token: str = typer.Option(..., "--token"),
+    urls: list[str] = typer.Option(..., "--url"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Verify an exact token on explicitly supplied public profile URLs."""
+    try:
+        results = verify_urls(urls, token)
+    except (OSError, ValueError) as error:
+        handle_error(error)
+    if as_json:
+        emit([asdict(result) for result in results], as_json=True)
+        return
+    for result in results:
+        status = "VERIFIED" if result.verified else "NOT VERIFIED"
+        typer.echo(f"{status} {result.url} - {result.evidence}")
 
 
 @app.command()
