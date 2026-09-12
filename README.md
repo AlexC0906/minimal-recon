@@ -16,6 +16,8 @@ coupling the CLI to network or file-system logic.
 - `web`: passive inspection of public web security headers
 - `subdomains`: passive discovery from Certificate Transparency logs
 - `report`: consolidated JSON or HTML audit report
+- `whois`: public RDAP registration, registrar, dates and nameservers
+- `geoip`: approximate IP location and network ownership information
 
 ## Setup
 
@@ -49,6 +51,8 @@ python -m minimal_recon.cli dns example.com --json
 python -m minimal_recon.cli footprint octocat --delay 0.5 --json
 python -m minimal_recon.cli web https://example.com --json
 python -m minimal_recon.cli subdomains example.com --json
+python -m minimal_recon.cli whois example.com --json
+python -m minimal_recon.cli geoip 1.1.1.1 --json
 python -m minimal_recon.cli report example.com --username alex576_ --output audit.json --html audit.html
 ```
 
@@ -85,6 +89,9 @@ Subdomain discovery uses public Certificate Transparency records and does not sc
 the discovered hosts.
 Reports combine the passive checks into portable JSON and HTML files with timestamps
 and source URLs.
+WHOIS data comes from RDAP and may omit private or registry-restricted fields.
+IP geolocation is approximate and usually identifies the network, CDN or hosting
+provider rather than a precise physical location.
 
 ## Roadmap
 

@@ -15,6 +15,8 @@ from minimal_recon.services.metadata import extract_metadata
 from minimal_recon.services.web import check_web
 from minimal_recon.services.subdomains import enumerate_subdomains
 from minimal_recon.services.report import build_report, write_report
+from minimal_recon.services.whois import lookup_whois
+from minimal_recon.services.geoip import geolocate_ip
 
 app = typer.Typer(help="Read-only OSINT reconnaissance utilities.")
 
@@ -67,6 +69,44 @@ def dns_enumeration(domain: str, as_json: bool = typer.Option(False, "--json")) 
     for record_type, values in records.items():
         for value in values:
             typer.echo(f"{record_type}: {value}")
+
+
+@app.command("whois")
+def whois_lookup(domain: str, as_json: bool = typer.Option(False, "--json")) -> None:
+    """Query public domain registration data through RDAP."""
+    try:
+        result = lookup_whois(domain)
+    except (OSError, ValueError) as error:
+        handle_error(error)
+    if as_json:
+        emit(result, as_json=True)
+        return
+    typer.echo(f"Domain: {result.domain}")
+    typer.echo(f"Registrar: {result.registrar or 'unknown'}")
+    typer.echo(f"Registered: {result.registration_date or 'unknown'}")
+    typer.echo(f"Expires: {result.expiration_date or 'unknown'}")
+    typer.echo(f"Last changed: {result.last_changed or 'unknown'}")
+    typer.echo(f"Nameservers: {', '.join(result.nameservers) or 'unknown'}")
+    typer.echo(f"Source: {result.source}")
+
+
+@app.command("geoip")
+def geoip_lookup(ip: str, as_json: bool = typer.Option(False, "--json")) -> None:
+    """Query approximate public geolocation and hosting data for an IP."""
+    try:
+        result = geolocate_ip(ip)
+    except (OSError, ValueError) as error:
+        handle_error(error)
+    if as_json:
+        emit(result, as_json=True)
+        return
+    typer.echo(f"IP: {result.ip}")
+    typer.echo(f"Location: {result.city or 'unknown'}, {result.region or 'unknown'}, {result.country or 'unknown'}")
+    typer.echo(f"Coordinates: {result.latitude}, {result.longitude}")
+    typer.echo(f"ISP: {result.isp or 'unknown'}")
+    typer.echo(f"Organization: {result.organization or 'unknown'}")
+    typer.echo(f"ASN: {result.asn or 'unknown'}")
+    typer.echo(f"Source: {result.source}")
 
 
 @app.command()

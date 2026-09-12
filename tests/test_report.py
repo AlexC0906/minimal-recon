@@ -26,8 +26,10 @@ def test_write_report_creates_json_and_html(tmp_path):
 def test_build_report_aggregates_passive_checks(monkeypatch):
     monkeypatch.setattr(report, "lookup_target", lambda domain: {"target": domain})
     monkeypatch.setattr(report, "enumerate_dns", lambda domain: {"A": ["192.0.2.10"]})
+    monkeypatch.setattr(report, "lookup_whois", lambda domain: {"domain": domain})
     monkeypatch.setattr(report, "enumerate_subdomains", lambda domain: {"subdomains": [domain]})
     monkeypatch.setattr(report, "check_web", lambda url: {"url": url, "status_code": 200})
+    monkeypatch.setattr(report, "geolocate_ip", lambda address: {"ip": address})
     monkeypatch.setattr(report, "check_username", lambda username, delay_seconds: [username])
     monkeypatch.setattr(report, "analyze_email", lambda address: {"email": address})
 
@@ -35,6 +37,7 @@ def test_build_report_aggregates_passive_checks(monkeypatch):
 
     assert result["target"] == "example.test"
     assert result["dns"]["records"] == {"A": ["192.0.2.10"]}
+    assert result["whois"] == {"domain": "example.test"}
     assert result["username_footprint"] == ["alice"]
     assert result["email"] == {"email": "alice@example.test"}
 
