@@ -3,6 +3,7 @@
 from dataclasses import asdict, is_dataclass
 import json
 from pathlib import Path
+import ssl
 from typing import Any
 
 import typer
@@ -21,6 +22,7 @@ from minimal_recon.services.geoip import geolocate_ip
 from minimal_recon.services.archive import enumerate_archive
 from minimal_recon.services.verification import create_token, verify_urls
 from minimal_recon.services.threatintel import check_reputation
+from minimal_recon.services.tls import inspect_tls
 
 app = typer.Typer(help="Read-only OSINT reconnaissance utilities.")
 
@@ -172,6 +174,29 @@ def reputation_check(target: str, as_json: bool = typer.Option(False, "--json"))
     typer.echo(f"Undetected: {result.undetected}")
     typer.echo(f"Reputation: {result.reputation}")
     typer.echo(f"Source: {result.source}")
+
+
+@app.command("tls")
+def tls_check(
+    hostname: str,
+    port: int = typer.Option(443, "--port", min=1, max=65535),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Inspect one public TLS endpoint and certificate."""
+    try:
+        result = inspect_tls(hostname, port)
+    except (OSError, ValueError, ssl.SSLError) as error:
+        handle_error(error)
+    if as_json:
+        emit(result, as_json=True)
+        return
+    typer.echo(f"Host: {result.hostname}:{result.port}")
+    typer.echo(f"TLS: {result.tls_version}")
+    typer.echo(f"Cipher: {result.cipher}")
+    typer.echo(f"Subject: {result.subject}")
+    typer.echo(f"Issuer: {result.issuer}")
+    typer.echo(f"Expires: {result.not_after or 'unknown'}")
+    typer.echo(f"Days until expiry: {result.days_until_expiry}")
 
 
 @app.command()
