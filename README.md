@@ -13,7 +13,7 @@ coupling the CLI to network or file-system logic.
 - `footprint`: low-volume username checks against an explicit public-site registry
 - `email`: email format validation and public MX record analysis
 - `metadata`: local filesystem metadata plus image dimensions and readable EXIF fields
-- `web`: passive inspection of public web security headers
+- `web`: passive web security headers, WAF and technology fingerprint detection
 - `subdomains`: passive discovery from Certificate Transparency logs
 - `report`: consolidated JSON or HTML audit report
 - `whois`: public RDAP registration, registrar, dates and nameservers
@@ -26,8 +26,6 @@ coupling the CLI to network or file-system logic.
 - `links`: single-page surface link extraction without recursive crawling
 - `anti-spoofing`: public SPF, DMARC and selected DKIM policy analysis
 - `public-files`: checks intentionally public standard web documents
-- `web`: passive security headers, WAF and technology fingerprint detection
-- `web`: passive security headers and WAF fingerprint detection
 
 ## Setup
 
@@ -158,11 +156,10 @@ recon verify --token minimal-recon-verify-... --url https://github.com/your-user
 
 ## Roadmap
 
-1. Stabilize the core services with validation, timeouts and mock-based tests.
-2. Add richer DNS analysis, including nameserver and mail-provider summaries.
-3. Add configurable public username and email checks with rate limiting.
-4. Add export formats and a small plugin interface for new OSINT collectors.
-5. Add CI checks for tests, type checking and packaging.
+1. Publish the first stable `v0.1.0` release.
+2. Add configurable site and timeout settings.
+3. Add report comparison and historical monitoring.
+4. Add optional type checking and packaging automation.
 
 Only use this tool against systems, domains, files and identities you are authorized
 to investigate. The first version intentionally avoids brute force, stealth and
