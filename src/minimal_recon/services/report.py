@@ -21,6 +21,7 @@ from minimal_recon.services.tls import inspect_tls
 from minimal_recon.services.links import extract_links
 from minimal_recon.services.antispoofing import analyze_anti_spoofing
 from minimal_recon.services.public_files import discover_public_files
+from minimal_recon import __version__
 
 
 def build_report(
@@ -31,6 +32,7 @@ def build_report(
     """Collect a read-only report for a domain and optional public identifiers."""
     report: Dict[str, Any] = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "tool_version": __version__,
         "target": domain,
         "lookup": _safe_call(lambda: _serialize(lookup_target(domain))),
         "dns": _safe_call(lambda: _collect_dns(domain)),

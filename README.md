@@ -73,6 +73,7 @@ python -m minimal_recon.cli report example.com --username alex576_ --output audi
 
 ```powershell
 recon --help
+recon --version
 recon lookup example.com
 recon lookup example.com --json
 recon dns example.com

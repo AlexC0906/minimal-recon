@@ -28,7 +28,28 @@ from minimal_recon.services.links import extract_links
 from minimal_recon.services.antispoofing import analyze_anti_spoofing
 from minimal_recon.services.public_files import discover_public_files
 
+from minimal_recon import __version__
+
 app = typer.Typer(help="Read-only OSINT reconnaissance utilities.")
+
+
+def version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"Minimal Recon {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        callback=version_callback,
+        is_eager=True,
+        help="Show the installed version and exit.",
+    ),
+) -> None:
+    """Read-only OSINT reconnaissance utilities."""
 
 
 def emit(data: Any, as_json: bool) -> None:
