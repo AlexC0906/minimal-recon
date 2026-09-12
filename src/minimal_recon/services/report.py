@@ -15,6 +15,7 @@ from minimal_recon.services.subdomains import enumerate_subdomains
 from minimal_recon.services.web import check_web
 from minimal_recon.services.geoip import geolocate_ip
 from minimal_recon.services.whois import lookup_whois
+from minimal_recon.services.archive import enumerate_archive
 
 
 def build_report(
@@ -29,6 +30,7 @@ def build_report(
         "lookup": _safe_call(lambda: _serialize(lookup_target(domain))),
         "dns": _safe_call(lambda: _collect_dns(domain)),
         "whois": _safe_call(lambda: _serialize(lookup_whois(domain))),
+        "archive": _safe_call(lambda: _serialize(enumerate_archive(domain))),
         "subdomains": _safe_call(lambda: _serialize(enumerate_subdomains(domain))),
         "web": _safe_call(lambda: _serialize(check_web(f"https://{domain}"))),
     }

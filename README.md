@@ -18,6 +18,7 @@ coupling the CLI to network or file-system logic.
 - `report`: consolidated JSON or HTML audit report
 - `whois`: public RDAP registration, registrar, dates and nameservers
 - `geoip`: approximate IP location and network ownership information
+- `archive`: public website history from the Wayback Machine
 
 ## Setup
 
@@ -53,6 +54,7 @@ python -m minimal_recon.cli web https://example.com --json
 python -m minimal_recon.cli subdomains example.com --json
 python -m minimal_recon.cli whois example.com --json
 python -m minimal_recon.cli geoip 1.1.1.1 --json
+python -m minimal_recon.cli archive example.com --json
 python -m minimal_recon.cli report example.com --username alex576_ --output audit.json --html audit.html
 ```
 
@@ -94,6 +96,8 @@ and source URLs.
 WHOIS data comes from RDAP and may omit private or registry-restricted fields.
 IP geolocation is approximate and usually identifies the network, CDN or hosting
 provider rather than a precise physical location.
+Archive history uses the public Wayback CDX index and returns snapshot links; it does
+not download archived pages.
 
 ## Roadmap
 

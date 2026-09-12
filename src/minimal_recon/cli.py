@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import typer
+import httpx
 
 from minimal_recon.services.dns import enumerate_dns, summarize_dns
 from minimal_recon.services.email import analyze_email
@@ -17,6 +18,7 @@ from minimal_recon.services.subdomains import enumerate_subdomains
 from minimal_recon.services.report import build_report, write_report
 from minimal_recon.services.whois import lookup_whois
 from minimal_recon.services.geoip import geolocate_ip
+from minimal_recon.services.archive import enumerate_archive
 
 app = typer.Typer(help="Read-only OSINT reconnaissance utilities.")
 
@@ -43,7 +45,7 @@ def lookup(target: str, as_json: bool = typer.Option(False, "--json")) -> None:
     """Resolve an IP address or domain to basic network information."""
     try:
         result = lookup_target(target)
-    except (OSError, ValueError) as error:
+    except (httpx.HTTPError, OSError, ValueError) as error:
         handle_error(error)
     if as_json:
         emit(result, as_json=True)
@@ -107,6 +109,22 @@ def geoip_lookup(ip: str, as_json: bool = typer.Option(False, "--json")) -> None
     typer.echo(f"Organization: {result.organization or 'unknown'}")
     typer.echo(f"ASN: {result.asn or 'unknown'}")
     typer.echo(f"Source: {result.source}")
+
+
+@app.command("archive")
+def archive_history(domain: str, as_json: bool = typer.Option(False, "--json")) -> None:
+    """List public Wayback Machine snapshots for a domain."""
+    try:
+        result = enumerate_archive(domain)
+    except (httpx.HTTPError, OSError, ValueError) as error:
+        handle_error(error)
+    if as_json:
+        emit(result, as_json=True)
+        return
+    typer.echo(f"Domain: {result.domain}")
+    typer.echo(f"Source: {result.source}")
+    for snapshot in result.snapshots:
+        typer.echo(f"{snapshot.timestamp} {snapshot.original_url} {snapshot.archive_url}")
 
 
 @app.command()
