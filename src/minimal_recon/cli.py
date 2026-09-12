@@ -353,6 +353,9 @@ def web_check(url: str, as_json: bool = typer.Option(False, "--json")) -> None:
     typer.echo(f"WAF: {result.waf_vendor or 'not detected'}")
     typer.echo(f"WAF signals: {', '.join(result.waf_signals) or 'none'}")
     typer.echo(f"WAF confidence: {result.waf_confidence}")
+    typer.echo("Technologies:")
+    for technology, signals in result.technologies.items():
+        typer.echo(f"  {technology}: {', '.join(signals)}")
 
 
 @app.command("subdomains")
