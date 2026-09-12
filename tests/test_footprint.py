@@ -12,7 +12,11 @@ class FakeClient:
     def get(self, url):
         self.urls.append(url)
         status_code = next(self.status_codes)
-        text = "alice public profile" if status_code == 200 else "page not found"
+        text = (
+            "<title>Alice Profile</title><meta name=\"description\" content=\"Public profile\">alice public profile"
+            if status_code == 200
+            else "page not found"
+        )
         return httpx.Response(status_code, text=text, request=httpx.Request("GET", url))
 
 
@@ -29,6 +33,8 @@ def test_check_username_uses_registry_and_records_status():
     assert [result.status_code for result in results] == [200, 404]
     assert results[0].match_basis == "profile_content_signal"
     assert results[0].state == "found"
+    assert results[0].page_title == "Alice Profile"
+    assert results[0].meta_description == "Public profile"
     assert results[1].match_basis == "http_status_404"
     assert results[1].state == "not_found"
     assert all(result.checked_at for result in results)

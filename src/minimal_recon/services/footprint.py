@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 import re
 import time
 from typing import Dict, List, Optional
@@ -18,6 +19,9 @@ class FootprintResult:
     match_basis: str = "request_error"
     state: str = "unknown"
     checked_at: str = ""
+    final_url: str = ""
+    page_title: str = ""
+    meta_description: str = ""
 
 
 SITES = {
@@ -45,6 +49,44 @@ NOT_FOUND_MARKERS = (
 )
 
 CHALLENGE_MARKERS = ("js_challenge", "consent.youtube.com")
+
+
+class _PageSummaryParser(HTMLParser):
+    """Extract only public page title and meta description."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.title_parts: List[str] = []
+        self.page_title = ""
+        self.meta_description = ""
+        self.in_title = False
+
+    def handle_starttag(self, tag: str, attrs: List[tuple[str, Optional[str]]]) -> None:
+        attributes = dict(attrs)
+        if tag.lower() == "title":
+            self.in_title = True
+        if tag.lower() == "meta" and attributes.get("name", "").lower() == "description":
+            self.meta_description = _compact_text(attributes.get("content", ""))[:300]
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() == "title":
+            self.in_title = False
+            self.page_title = _compact_text(" ".join(self.title_parts))[:200]
+
+    def handle_data(self, data: str) -> None:
+        if self.in_title:
+            self.title_parts.append(data)
+
+
+def _compact_text(value: str) -> str:
+    return " ".join(value.split())
+
+
+def summarize_public_page(content: str) -> tuple[str, str]:
+    """Extract a minimal public page summary without collecting profile content."""
+    parser = _PageSummaryParser()
+    parser.feed(content[:500_000])
+    return parser.page_title, parser.meta_description
 
 
 def validate_username(username: str) -> str:
@@ -79,6 +121,7 @@ def check_username(
                     )
                 )
             else:
+                page_title, meta_description = summarize_public_page(response.text)
                 body = response.text.lower()
                 has_not_found_marker = any(marker in body for marker in NOT_FOUND_MARKERS)
                 has_challenge_marker = any(marker in body or marker in str(response.url).lower() for marker in CHALLENGE_MARKERS)
@@ -108,6 +151,9 @@ def check_username(
                         match_basis,
                         state,
                         checked_at,
+                        str(response.url),
+                        page_title,
+                        meta_description,
                     )
                 )
             if delay_seconds > 0 and index < len(registry) - 1:

@@ -148,6 +148,10 @@ def footprint(
             "unknown": "UNKNOWN",
         }[result.state]
         typer.echo(f"{result.site}: {status} {result.url}")
+        if result.found and result.page_title:
+            typer.echo(f"  Title: {result.page_title}")
+        if result.found and result.meta_description:
+            typer.echo(f"  Description: {result.meta_description}")
 
 
 @app.command("email")
