@@ -263,6 +263,9 @@ def web_check(url: str, as_json: bool = typer.Option(False, "--json")) -> None:
     for name, value in result.security_headers.items():
         typer.echo(f"{name}: {value}")
     typer.echo(f"Missing headers: {', '.join(result.missing_security_headers) or 'none'}")
+    typer.echo(f"WAF: {result.waf_vendor or 'not detected'}")
+    typer.echo(f"WAF signals: {', '.join(result.waf_signals) or 'none'}")
+    typer.echo(f"WAF confidence: {result.waf_confidence}")
 
 
 @app.command("subdomains")
