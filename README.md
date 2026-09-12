@@ -82,7 +82,9 @@ as `FOUND`, `NOT FOUND` or `UNKNOWN`; platform challenges and generic pages are 
 as `UNKNOWN`.
 Metadata inspection is local-only and does not upload files anywhere.
 Email analysis does not verify mailbox existence or query breach databases; it only
-checks the address format and public MX records.
+checks the address format and public MX records. It also flags missing MX records,
+role-based addresses and a small built-in list of disposable email domains. These
+are heuristics, not proof that a mailbox exists or is compromised.
 Web checks make one normal HTTP request and report selected response headers; they do
 not scan ports, crawl pages or attempt to bypass access controls.
 Subdomain discovery uses public Certificate Transparency records and does not scan
