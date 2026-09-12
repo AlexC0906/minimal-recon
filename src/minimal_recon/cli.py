@@ -24,6 +24,7 @@ from minimal_recon.services.verification import create_token, verify_urls
 from minimal_recon.services.threatintel import check_reputation
 from minimal_recon.services.tls import inspect_tls
 from minimal_recon.services.shodan import lookup_host
+from minimal_recon.services.links import extract_links
 
 app = typer.Typer(help="Read-only OSINT reconnaissance utilities.")
 
@@ -219,6 +220,31 @@ def shodan_lookup(ip: str, as_json: bool = typer.Option(False, "--json")) -> Non
     typer.echo(f"Indexed ports: {', '.join(map(str, result.ports)) or 'none'}")
     typer.echo(f"Domains: {', '.join(result.domains) or 'none'}")
     typer.echo(f"Last update: {result.last_update or 'unknown'}")
+
+
+@app.command("links")
+def links_command(
+    url: str,
+    max_links: int = typer.Option(500, "--max-links", min=1, max=5000),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Extract links from one public page without following them."""
+    try:
+        result = extract_links(url, max_links=max_links)
+    except (httpx.HTTPError, OSError, ValueError) as error:
+        handle_error(error)
+    if as_json:
+        emit(result, as_json=True)
+        return
+    typer.echo(f"Source: {result.source_url}")
+    typer.echo(f"Final URL: {result.final_url}")
+    typer.echo(f"Links found: {result.links_found}")
+    typer.echo("Internal links:")
+    for link in result.internal_links:
+        typer.echo(f"  {link}")
+    typer.echo("External links:")
+    for link in result.external_links:
+        typer.echo(f"  {link}")
 
 
 @app.command()
