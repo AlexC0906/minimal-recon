@@ -1,5 +1,6 @@
 import json
 
+import httpx
 from typer.testing import CliRunner
 
 from minimal_recon import cli
@@ -95,3 +96,12 @@ def test_footprint_text_output_shows_status_and_full_url(monkeypatch):
 
     assert result.exit_code == 0
     assert "instagram: FOUND https://www.instagram.com/alice/" in result.stdout
+
+
+def test_web_timeout_has_short_network_error(monkeypatch):
+    monkeypatch.setattr(cli, "check_web", lambda url: (_ for _ in ()).throw(httpx.ReadTimeout("timed out")))
+
+    result = runner.invoke(cli.app, ["web", "https://example.test"])
+
+    assert result.exit_code == 1
+    assert "Error: network timeout" in result.output

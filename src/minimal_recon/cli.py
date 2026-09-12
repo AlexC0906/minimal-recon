@@ -44,7 +44,15 @@ def emit(data: Any, as_json: bool) -> None:
 
 
 def handle_error(error: Exception) -> None:
-    typer.echo(f"Error: {error}", err=True)
+    if isinstance(error, httpx.TimeoutException):
+        message = "network timeout"
+    elif isinstance(error, httpx.HTTPStatusError):
+        message = f"remote service returned HTTP {error.response.status_code}"
+    elif isinstance(error, httpx.RequestError):
+        message = "network connection failed"
+    else:
+        message = str(error)
+    typer.echo(f"Error: {message}", err=True)
     raise typer.Exit(code=1)
 
 
@@ -71,7 +79,7 @@ def dns_enumeration(domain: str, as_json: bool = typer.Option(False, "--json")) 
     """Query common DNS records for a domain."""
     try:
         records = enumerate_dns(domain)
-    except (OSError, ValueError) as error:
+    except (httpx.HTTPError, OSError, ValueError) as error:
         handle_error(error)
     if as_json:
         emit({"domain": domain, "records": records, "summary": summarize_dns(records)}, as_json=True)
@@ -86,7 +94,7 @@ def whois_lookup(domain: str, as_json: bool = typer.Option(False, "--json")) -> 
     """Query public domain registration data through RDAP."""
     try:
         result = lookup_whois(domain)
-    except (OSError, ValueError) as error:
+    except (httpx.HTTPError, OSError, ValueError) as error:
         handle_error(error)
     if as_json:
         emit(result, as_json=True)
@@ -105,7 +113,7 @@ def geoip_lookup(ip: str, as_json: bool = typer.Option(False, "--json")) -> None
     """Query approximate public geolocation and hosting data for an IP."""
     try:
         result = geolocate_ip(ip)
-    except (OSError, ValueError) as error:
+    except (httpx.HTTPError, OSError, ValueError) as error:
         handle_error(error)
     if as_json:
         emit(result, as_json=True)
@@ -150,7 +158,7 @@ def verify_profiles(
     """Verify an exact token on explicitly supplied public profile URLs."""
     try:
         results = verify_urls(urls, token)
-    except (OSError, ValueError) as error:
+    except (httpx.HTTPError, OSError, ValueError) as error:
         handle_error(error)
     if as_json:
         emit([asdict(result) for result in results], as_json=True)
@@ -258,7 +266,7 @@ def anti_spoofing_check(
     """Check public SPF, DMARC and selected DKIM policies."""
     try:
         result = analyze_anti_spoofing(domain, [item for item in selectors.split(",") if item.strip()])
-    except (OSError, ValueError) as error:
+    except (httpx.HTTPError, OSError, ValueError) as error:
         handle_error(error)
     if as_json:
         emit(result, as_json=True)
@@ -339,7 +347,7 @@ def web_check(url: str, as_json: bool = typer.Option(False, "--json")) -> None:
     """Passively inspect public web security headers."""
     try:
         result = check_web(url)
-    except (OSError, ValueError) as error:
+    except (httpx.HTTPError, OSError, ValueError) as error:
         handle_error(error)
     if as_json:
         emit(result, as_json=True)
