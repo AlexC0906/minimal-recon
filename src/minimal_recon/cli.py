@@ -145,6 +145,10 @@ def email_analysis(address: str, as_json: bool = typer.Option(False, "--json")) 
     typer.echo(f"Email: {result.email}")
     typer.echo(f"Domain: {result.domain}")
     typer.echo(f"Valid format: {result.valid}")
+    typer.echo(f"MX available: {result.mx_available}")
+    typer.echo(f"Role address: {result.is_role_address}")
+    typer.echo(f"Disposable domain: {result.is_disposable_domain}")
+    typer.echo(f"Risk flags: {', '.join(result.risk_flags) or 'none'}")
     for record in result.mx_records:
         typer.echo(f"MX: {record}")
 

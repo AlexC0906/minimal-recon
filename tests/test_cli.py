@@ -40,7 +40,15 @@ def test_email_json_output(monkeypatch):
         cli,
         "analyze_email",
         lambda address: EmailResult(
-            address, "analyst", "example.test", True, ["10 mail.example.test."]
+            address,
+            "analyst",
+            "example.test",
+            True,
+            ["10 mail.example.test."],
+            True,
+            False,
+            False,
+            [],
         ),
     )
 

@@ -10,6 +10,14 @@ from minimal_recon.services.dns import normalize_domain
 
 
 EMAIL_PATTERN = re.compile(r"^([^@\s]+)@([^@\s]+)$")
+ROLE_PREFIXES = {"admin", "contact", "hello", "info", "noreply", "sales", "support", "security"}
+DISPOSABLE_DOMAINS = {
+    "10minutemail.com",
+    "guerrillamail.com",
+    "mailinator.com",
+    "tempmail.com",
+    "yopmail.com",
+}
 
 
 @dataclass(frozen=True)
@@ -19,6 +27,10 @@ class EmailResult:
     domain: str
     valid: bool
     mx_records: List[str]
+    mx_available: bool
+    is_role_address: bool
+    is_disposable_domain: bool
+    risk_flags: List[str]
 
 
 def analyze_email(
@@ -42,7 +54,26 @@ def analyze_email(
     else:
         mx_records = [answer.to_text() for answer in answers]
 
-    return EmailResult(email.strip(), local_part, domain, True, mx_records)
+    is_role_address = local_part.lower() in ROLE_PREFIXES
+    is_disposable_domain = domain in DISPOSABLE_DOMAINS
+    risk_flags = []
+    if not mx_records:
+        risk_flags.append("no_mx_records")
+    if is_role_address:
+        risk_flags.append("role_address")
+    if is_disposable_domain:
+        risk_flags.append("disposable_domain")
+    return EmailResult(
+        email.strip(),
+        local_part,
+        domain,
+        True,
+        mx_records,
+        bool(mx_records),
+        is_role_address,
+        is_disposable_domain,
+        risk_flags,
+    )
 
 
 def email_to_dict(result: EmailResult) -> Dict[str, Any]:
