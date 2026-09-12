@@ -12,6 +12,20 @@ def test_render_html_escapes_report_content():
     assert "<script>alert" not in rendered
 
 
+def test_render_html_contains_summary_cards_and_clickable_urls():
+    rendered = report.render_html(
+        {
+            "target": "example.test",
+            "generated_at": "2026-01-01T00:00:00Z",
+            "links": {"links_found": 1, "external_links": ["https://external.test/page"]},
+        }
+    )
+
+    assert 'class="summary"' in rendered
+    assert 'href="https://external.test/page"' in rendered
+    assert 'target="_blank"' in rendered
+
+
 def test_write_report_creates_json_and_html(tmp_path):
     data = {"target": "example.test", "items": ["a", "b"]}
     json_path = tmp_path / "report.json"
