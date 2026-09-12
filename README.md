@@ -156,7 +156,6 @@ recon verify --token minimal-recon-verify-... --url https://github.com/your-user
 
 ## Roadmap
 
-1. Publish the first stable `v0.1.0` release.
 2. Add configurable site and timeout settings.
 3. Add report comparison and historical monitoring.
 4. Add optional type checking and packaging automation.
