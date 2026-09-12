@@ -18,6 +18,7 @@ from minimal_recon.services.whois import lookup_whois
 from minimal_recon.services.archive import enumerate_archive
 from minimal_recon.services.tls import inspect_tls
 from minimal_recon.services.links import extract_links
+from minimal_recon.services.antispoofing import analyze_anti_spoofing
 
 
 def build_report(
@@ -37,6 +38,7 @@ def build_report(
         "web": _safe_call(lambda: _serialize(check_web(f"https://{domain}"))),
         "tls": _safe_call(lambda: _serialize(inspect_tls(domain))),
         "links": _safe_call(lambda: _serialize(extract_links(f"https://{domain}"))),
+        "anti_spoofing": _safe_call(lambda: _serialize(analyze_anti_spoofing(domain))),
     }
     report["geoip"] = _safe_call(lambda: _collect_geoip(report["lookup"]))
     if username:
