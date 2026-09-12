@@ -21,6 +21,7 @@ coupling the CLI to network or file-system logic.
 - `archive`: public website history from the Wayback Machine
 - `verify`: explicit proof-of-control verification for supplied profile URLs
 - `reputation`: optional read-only VirusTotal IP/domain reputation lookup
+- `tls`: read-only TLS version and certificate inspection
 
 ## Setup
 
@@ -57,6 +58,7 @@ python -m minimal_recon.cli subdomains example.com --json
 python -m minimal_recon.cli whois example.com --json
 python -m minimal_recon.cli geoip 1.1.1.1 --json
 python -m minimal_recon.cli archive example.com --json
+python -m minimal_recon.cli tls example.com --json
 python -m minimal_recon.cli report example.com --username alex576_ --output audit.json --html audit.html
 ```
 
@@ -101,6 +103,8 @@ IP geolocation is approximate and usually identifies the network, CDN or hosting
 provider rather than a precise physical location.
 Archive history uses the public Wayback CDX index and returns snapshot links; it does
 not download archived pages.
+TLS checks connect only to the requested host and port, report the negotiated protocol,
+cipher and certificate dates, and do not scan other ports.
 Ownership verification is opt-in: generate a token, publish it temporarily on each
 profile you control, then pass those exact URLs to `verify`. It does not discover or
 link accounts automatically.

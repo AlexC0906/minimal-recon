@@ -16,6 +16,7 @@ from minimal_recon.services.web import check_web
 from minimal_recon.services.geoip import geolocate_ip
 from minimal_recon.services.whois import lookup_whois
 from minimal_recon.services.archive import enumerate_archive
+from minimal_recon.services.tls import inspect_tls
 
 
 def build_report(
@@ -33,6 +34,7 @@ def build_report(
         "archive": _safe_call(lambda: _serialize(enumerate_archive(domain))),
         "subdomains": _safe_call(lambda: _serialize(enumerate_subdomains(domain))),
         "web": _safe_call(lambda: _serialize(check_web(f"https://{domain}"))),
+        "tls": _safe_call(lambda: _serialize(inspect_tls(domain))),
     }
     report["geoip"] = _safe_call(lambda: _collect_geoip(report["lookup"]))
     if username:
