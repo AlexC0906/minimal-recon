@@ -25,6 +25,7 @@ coupling the CLI to network or file-system logic.
 - `tls`: read-only TLS version and certificate inspection
 - `links`: single-page surface link extraction without recursive crawling
 - `anti-spoofing`: public SPF, DMARC and selected DKIM policy analysis
+- `public-files`: checks intentionally public standard web documents
 - `web`: passive security headers and WAF fingerprint detection
 
 ## Setup
@@ -120,6 +121,10 @@ can be supplied explicitly:
 ```powershell
 recon anti-spoofing example.com --selectors google,default --json
 ```
+
+Public file discovery checks only a small allowlist of standard documents such as
+`robots.txt`, `sitemap.xml` and `security.txt`. It does not brute-force hidden paths
+or request sensitive files such as `.env`, backups or configuration dumps.
 Ownership verification is opt-in: generate a token, publish it temporarily on each
 profile you control, then pass those exact URLs to `verify`. It does not discover or
 link accounts automatically.

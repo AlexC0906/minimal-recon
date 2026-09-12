@@ -26,6 +26,7 @@ from minimal_recon.services.tls import inspect_tls
 from minimal_recon.services.shodan import lookup_host
 from minimal_recon.services.links import extract_links
 from minimal_recon.services.antispoofing import analyze_anti_spoofing
+from minimal_recon.services.public_files import discover_public_files
 
 app = typer.Typer(help="Read-only OSINT reconnaissance utilities.")
 
@@ -268,6 +269,21 @@ def anti_spoofing_check(
     typer.echo(f"DKIM: {result.dkim_status}")
     for finding in result.findings:
         typer.echo(f"Finding: {finding}")
+
+
+@app.command("public-files")
+def public_files_check(url: str, as_json: bool = typer.Option(False, "--json")) -> None:
+    """Check standard public web documents without brute-force discovery."""
+    try:
+        results = discover_public_files(url)
+    except (httpx.HTTPError, OSError, ValueError) as error:
+        handle_error(error)
+    if as_json:
+        emit([asdict(result) for result in results], as_json=True)
+        return
+    for result in results:
+        status = "FOUND" if result.found else "NOT FOUND"
+        typer.echo(f"{status} {result.url} ({result.status_code or 'request error'})")
 
 
 @app.command()
