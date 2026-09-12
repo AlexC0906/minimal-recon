@@ -13,6 +13,8 @@ from minimal_recon.services.footprint import check_username
 from minimal_recon.services.lookup import lookup_target
 from minimal_recon.services.subdomains import enumerate_subdomains
 from minimal_recon.services.web import check_web
+from minimal_recon.services.geoip import geolocate_ip
+from minimal_recon.services.whois import lookup_whois
 
 
 def build_report(
@@ -26,9 +28,11 @@ def build_report(
         "target": domain,
         "lookup": _safe_call(lambda: _serialize(lookup_target(domain))),
         "dns": _safe_call(lambda: _collect_dns(domain)),
+        "whois": _safe_call(lambda: _serialize(lookup_whois(domain))),
         "subdomains": _safe_call(lambda: _serialize(enumerate_subdomains(domain))),
         "web": _safe_call(lambda: _serialize(check_web(f"https://{domain}"))),
     }
+    report["geoip"] = _safe_call(lambda: _collect_geoip(report["lookup"]))
     if username:
         report["username_footprint"] = _safe_call(
             lambda: _serialize(check_username(username, delay_seconds=0.2))
@@ -41,6 +45,12 @@ def build_report(
 def _collect_dns(domain: str) -> Dict[str, Any]:
     records = enumerate_dns(domain)
     return {"records": records, "summary": summarize_dns(records)}
+
+
+def _collect_geoip(lookup: Any) -> Any:
+    if not isinstance(lookup, dict) or "addresses" not in lookup:
+        return {"status": "error", "error": "lookup did not return addresses"}
+    return [_serialize(geolocate_ip(address)) for address in lookup["addresses"]]
 
 
 def _safe_call(operation: Any) -> Any:
