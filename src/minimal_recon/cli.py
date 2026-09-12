@@ -25,6 +25,7 @@ from minimal_recon.services.threatintel import check_reputation
 from minimal_recon.services.tls import inspect_tls
 from minimal_recon.services.shodan import lookup_host
 from minimal_recon.services.links import extract_links
+from minimal_recon.services.antispoofing import analyze_anti_spoofing
 
 app = typer.Typer(help="Read-only OSINT reconnaissance utilities.")
 
@@ -245,6 +246,28 @@ def links_command(
     typer.echo("External links:")
     for link in result.external_links:
         typer.echo(f"  {link}")
+
+
+@app.command("anti-spoofing")
+def anti_spoofing_check(
+    domain: str,
+    selectors: str = typer.Option("", "--selectors", help="Comma-separated DKIM selectors to check."),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Check public SPF, DMARC and selected DKIM policies."""
+    try:
+        result = analyze_anti_spoofing(domain, [item for item in selectors.split(",") if item.strip()])
+    except (OSError, ValueError) as error:
+        handle_error(error)
+    if as_json:
+        emit(result, as_json=True)
+        return
+    typer.echo(f"Domain: {result.domain}")
+    typer.echo(f"SPF: {result.spf_status}")
+    typer.echo(f"DMARC: {result.dmarc_status} (p={result.dmarc_policy or 'unknown'})")
+    typer.echo(f"DKIM: {result.dkim_status}")
+    for finding in result.findings:
+        typer.echo(f"Finding: {finding}")
 
 
 @app.command()

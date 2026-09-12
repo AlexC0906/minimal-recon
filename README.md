@@ -24,6 +24,7 @@ coupling the CLI to network or file-system logic.
 - `shodan`: optional read-only Shodan indexed host lookup
 - `tls`: read-only TLS version and certificate inspection
 - `links`: single-page surface link extraction without recursive crawling
+- `anti-spoofing`: public SPF, DMARC and selected DKIM policy analysis
 - `web`: passive security headers and WAF fingerprint detection
 
 ## Setup
@@ -113,6 +114,12 @@ WAF detection is passive and heuristic: it uses response headers and public resp
 markers, so `not_detected` does not prove that a site has no WAF.
 Link extraction reads one HTML page, removes fragments, separates internal and
 external HTTP(S) links, and never follows the discovered links automatically.
+Anti-spoofing checks inspect DNS records only. DKIM requires known selectors, which
+can be supplied explicitly:
+
+```powershell
+recon anti-spoofing example.com --selectors google,default --json
+```
 Ownership verification is opt-in: generate a token, publish it temporarily on each
 profile you control, then pass those exact URLs to `verify`. It does not discover or
 link accounts automatically.
