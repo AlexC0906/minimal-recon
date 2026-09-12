@@ -156,9 +156,9 @@ recon verify --token minimal-recon-verify-... --url https://github.com/your-user
 
 ## Roadmap
 
-2. Add configurable site and timeout settings.
-3. Add report comparison and historical monitoring.
-4. Add optional type checking and packaging automation.
+1. Add configurable site and timeout settings.
+2. Add report comparison and historical monitoring.
+3. Add optional type checking and packaging automation.
 
 Only use this tool against systems, domains, files and identities you are authorized
 to investigate. The first version intentionally avoids brute force, stealth and
