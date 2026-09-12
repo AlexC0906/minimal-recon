@@ -25,6 +25,13 @@ def test_lookup_json_output(monkeypatch):
     assert json.loads(result.stdout)["addresses"] == ["192.0.2.10"]
 
 
+def test_version_option_shows_tool_version():
+    result = runner.invoke(cli.app, ["--version"])
+
+    assert result.exit_code == 0
+    assert result.stdout.strip() == "Minimal Recon 0.1.0"
+
+
 def test_dns_json_output(monkeypatch):
     monkeypatch.setattr(cli, "enumerate_dns", lambda domain: {"A": ["192.0.2.10"]})
 

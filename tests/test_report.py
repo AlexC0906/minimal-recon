@@ -51,6 +51,7 @@ def test_build_report_aggregates_passive_checks(monkeypatch):
     result = report.build_report("example.test", "alice", "alice@example.test")
 
     assert result["target"] == "example.test"
+    assert result["tool_version"] == "0.1.0"
     assert result["dns"]["records"] == {"A": ["192.0.2.10"]}
     assert result["whois"] == {"domain": "example.test"}
     assert result["archive"] == {"snapshots": []}
