@@ -77,7 +77,8 @@ For `dns --json`, the response includes the raw records and a derived `summary`
 with nameservers, mail servers and conservative provider hints.
 Footprint checks use an explicit public-site registry containing GitHub, Instagram,
 Reddit, X, TikTok, YouTube, Twitch, Pinterest, Medium and Dev.to. Results include
-the source URL, HTTP status, UTC timestamp and an explicit match basis. They support
+the source URL, final URL, HTTP status, UTC timestamp, page title and meta description,
+plus an explicit match basis. They support
 `--delay` to space out requests and do not bypass authentication or access controls.
 A `200` response is not enough to prove that a profile exists. Results are classified
 as `FOUND`, `NOT FOUND` or `UNKNOWN`; platform challenges and generic pages are kept
