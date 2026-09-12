@@ -20,6 +20,7 @@ coupling the CLI to network or file-system logic.
 - `geoip`: approximate IP location and network ownership information
 - `archive`: public website history from the Wayback Machine
 - `verify`: explicit proof-of-control verification for supplied profile URLs
+- `reputation`: optional read-only VirusTotal IP/domain reputation lookup
 
 ## Setup
 
@@ -103,6 +104,15 @@ not download archived pages.
 Ownership verification is opt-in: generate a token, publish it temporarily on each
 profile you control, then pass those exact URLs to `verify`. It does not discover or
 link accounts automatically.
+
+External reputation checks use a user-provided VirusTotal API key and never upload
+files. Set it locally before running:
+
+```powershell
+$env:VT_API_KEY = "your-api-key"
+recon reputation example.com --json
+recon reputation 1.1.1.1 --json
+```
 
 ```powershell
 recon verify-token
