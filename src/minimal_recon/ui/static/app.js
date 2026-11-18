@@ -14,6 +14,28 @@ const STATE_LABELS = {
   not_applicable: "N/A",
 };
 
+// Why a site gave no profile, in plain words (keys are FootprintResult.match_basis).
+const REASONS = {
+  request_error: "The request failed",
+  username_not_valid_on_site: "Name not allowed on this site, so it was not checked",
+  empty_result: "The site's API has no account with this name",
+  not_found_marker: "The page says the account does not exist",
+  no_profile_marker: "The page loaded but showed no profile",
+  platform_challenge_or_consent: "Stopped by a consent or anti-bot page",
+};
+
+function reasonText(result) {
+  if (REASONS[result.match_basis]) return REASONS[result.match_basis];
+  const status = /^http_status_(\d+)$/.exec(result.match_basis);
+  if (!status) return result.match_basis.replaceAll("_", " ");
+  if (result.state === "not_found") return `No account at this address (HTTP ${status[1]})`;
+  if (result.state === "rate_limited") return `The site is limiting requests (HTTP ${status[1]})`;
+  return `Unexpected answer from the site (HTTP ${status[1]})`;
+}
+
+// Found profiles first, then answers that may change on a retry, then definite misses.
+const STATE_ORDER = { found: 0, unknown: 1, rate_limited: 2, not_found: 3, not_applicable: 4 };
+
 const PROFILE_LABELS = {
   display_name: "Name",
   bio: "Bio",
@@ -42,7 +64,7 @@ const TOOL_TABS = [
       {
         id: "report", label: "Full report", special: "report",
         about: "Runs every passive domain check at once and builds the visual report.",
-        fields: [F.domain, { name: "username", label: "Username (optional)", placeholder: "octocat", optional: true },
+        fields: [F.domain, { name: "username", label: "Username (optional)", optional: true },
           { name: "details", label: "Profile details for the username", type: "checkbox" },
           { name: "save", label: "Save to history", type: "checkbox", value: true }],
       },
@@ -407,16 +429,36 @@ function showReport(output, data) {
   jsonButton.addEventListener("click", () =>
     download(`report-${target}.json`, JSON.stringify(data.report, null, 2), "application/json"));
   htmlButton.addEventListener("click", () => download(`report-${target}.html`, data.html, "text/html"));
-  const frame = el("iframe", {
-    className: "report-frame",
-    attrs: { title: "Report", sandbox: "allow-popups allow-popups-to-escape-sandbox" },
-  });
-  frame.srcdoc = data.html;
+  const frame = reportFrame(data, "Report");
   fill(output,
     el("div", { className: "run-actions" }, [jsonButton, htmlButton]),
     data.history ? changesBanner(data.history, "domain") : null,
     frame,
   );
+}
+
+/**
+ * Show a report in a sandboxed frame that grows to its content.
+ * The sandbox allows no scripts; "allow-same-origin" only lets this page read
+ * the frame's height, so there is one scroll bar instead of two.
+ */
+function reportFrame(data, title) {
+  const frame = el("iframe", {
+    className: "report-frame",
+    attrs: { title, sandbox: "allow-same-origin allow-popups allow-popups-to-escape-sandbox" },
+  });
+  const fit = () => {
+    const doc = frame.contentDocument;
+    if (doc && doc.documentElement) frame.style.height = `${doc.documentElement.scrollHeight + 2}px`;
+  };
+  frame.addEventListener("load", () => {
+    fit();
+    for (const details of frame.contentDocument?.querySelectorAll("details") || []) {
+      details.addEventListener("toggle", fit);
+    }
+  });
+  frame.srcdoc = data.preview_html || data.html;
+  return frame;
 }
 
 /* ---------- history: shared rendering ---------- */
@@ -547,14 +589,22 @@ function profileList(result) {
       }));
     } else add(PROFILE_LABELS[name] || name, clampedText(value));
   }
-  if (!result.profile || !result.profile.display_name) {
-    if (result.page_title) add("Page title", clampedText(result.page_title, 2));
-    if (result.meta_description && !result.profile?.bio) {
-      add("Description", clampedText(result.meta_description));
-    }
-  }
   if (result.profile_note) add("Details", el("span", { className: "muted", text: result.profile_note }));
   return list.childElementCount ? list : null;
+}
+
+/** Title and description of a profile page, for sites without profile details. */
+function pageSummary(result) {
+  const profile = result.profile || {};
+  const title = profile.display_name ? "" : result.page_title;
+  const description = profile.bio ? "" : result.meta_description;
+  if (!title && !description) return null;
+  return el("div", { className: "page-summary" }, [
+    title ? el("p", { className: "page-title clamp clamp-1", text: title, attrs: { title } }) : null,
+    description
+      ? el("p", { className: "page-description clamp clamp-3", text: description, attrs: { title: description } })
+      : null,
+  ]);
 }
 
 function statsRow(stats) {
@@ -563,7 +613,7 @@ function statsRow(stats) {
     Object.entries(stats).map(([label, value]) =>
       el("span", { className: "stat" }, [
         el("strong", { text: Number(value).toLocaleString() }),
-        el("span", { text: ` ${label}` }),
+        el("span", { text: ` ${label.replaceAll("_", " ")}` }),
       ])));
 }
 
@@ -602,10 +652,12 @@ function resultCard(result) {
   if (result.found) {
     const stats = statsRow(result.profile && result.profile.stats);
     const details = profileList(result);
+    const summary = pageSummary(result);
     if (stats) card.append(stats);
     if (details) card.append(details);
+    if (summary) card.append(summary);
   } else {
-    card.append(el("div", { className: "muted small", text: result.match_basis.replaceAll("_", " ") }));
+    card.append(el("div", { className: "muted small", text: reasonText(result) }));
   }
   return card;
 }
@@ -626,7 +678,9 @@ function renderRuns() {
   container.replaceChildren();
   const foundOnly = $("opt-found-only").checked;
   for (const run of lastRuns) {
-    const visible = run.results.filter((result) => !foundOnly || result.found);
+    const visible = run.results
+      .filter((result) => !foundOnly || result.found)
+      .sort((a, b) => (STATE_ORDER[a.state] ?? 9) - (STATE_ORDER[b.state] ?? 9));
     const linksButton = el("button", { text: "Search links", attrs: { type: "button" } });
     const exportButton = el("button", { text: "Export JSON", attrs: { type: "button" } });
     const linksBox = el("div", { className: "links-box hidden" });
@@ -878,11 +932,7 @@ async function showHistoryEntry(id) {
     const data = await api("/api/history/get", { id });
     const heading = el("h2", { text: `${data.entry.target} · ${formatDate(data.entry.created_at)}` });
     if (data.entry.kind === "report") {
-      const frame = el("iframe", {
-        className: "report-frame",
-        attrs: { title: "Saved report", sandbox: "allow-popups allow-popups-to-escape-sandbox" },
-      });
-      frame.srcdoc = data.html;
+      const frame = reportFrame(data, "Saved report");
       output.replaceChildren(heading, frame);
     } else {
       const results = data.data.results || [];

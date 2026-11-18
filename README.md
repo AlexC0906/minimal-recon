@@ -9,7 +9,10 @@ and usernames, with a command line and a local web interface. It reads public da
 way a browser or resolver would. It does not scan ports, brute-force paths, log in or
 bypass protections.
 
-![Username search in the web interface](docs/images/ui-username.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/ui-username-dark.png">
+  <img alt="Username search in the web interface: five profiles found, three not found and one blocked by a consent page" src="docs/images/ui-username.png">
+</picture>
 
 ## Highlights
 
@@ -26,7 +29,7 @@ bypass protections.
 - **Privacy by design:** only what people chose to publish on a profile is read; email
   addresses, phone numbers, avatars and activity times are never collected, and opt-outs
   are respected.
-- 225 automated tests, Ruff and mypy in CI on Python 3.9, 3.12 and 3.13.
+- More than 200 automated tests, Ruff and mypy in CI on Python 3.9, 3.12 and 3.13.
 
 ## Quick start
 
@@ -67,7 +70,17 @@ To install the `recon` command without a virtual environment, use
 | History | Saved searches and reports: view, compare with the previous run or any two, delete |
 | Rules | Site-rule self-test |
 
-![Domain report in the web interface](docs/images/ui-domain-report.png)
+Username results appear as each site answers:
+
+![Live username results: a progress bar fills while profile cards appear](docs/images/ui-live.gif)
+
+The full domain report opens in the page, with the sections that usually need attention
+first:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/ui-domain-report-dark.png">
+  <img alt="Domain report for example.com: summary cards for DNS, WHOIS, TLS, email spoofing, web headers, subdomains and links, then the TLS details" src="docs/images/ui-domain-report.png">
+</picture>
 
 Options: `recon ui --port 9000` for another port, `--no-browser` to open it yourself, and
 `recon --timeout 30 ui` on slow networks. VirusTotal and Shodan use `VT_API_KEY` and

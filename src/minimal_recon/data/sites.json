@@ -20,8 +20,8 @@
           "x": "twitter_username"
         },
         "stats": {
-          "public_repos": "public_repos",
-          "public_gists": "public_gists",
+          "repos": "public_repos",
+          "gists": "public_gists",
           "followers": "followers"
         }
       }

@@ -95,27 +95,48 @@ def _is_error(value: Any) -> bool:
     return isinstance(value, dict) and value.get("status") == "error"
 
 
-def render_html(report: Dict[str, Any]) -> str:
-    """Render a dependency-free, escaped and scannable HTML report."""
-    title = html.escape(f"Minimal Recon report: {report['target']}")
-    sections = []
-    for name, value in report.items():
-        if name in _METADATA_KEYS:
-            continue
-        sections.append(
-            f'<section class="panel"><h2>{html.escape(_section_title(name))}</h2>'
-            f"{_render_value(value)}</section>"
-        )
-    summary = _summary_cards(report)
+# Sections that usually need attention come first; the rest keep report order.
+SECTION_ORDER = (
+    "tls", "anti_spoofing", "web", "dns", "subdomains", "whois", "public_files",
+    "username_footprint", "email", "links", "archive", "lookup", "geoip",
+)
+
+
+def render_html(report: Dict[str, Any], embedded: bool = False) -> str:
+    """Render a dependency-free, escaped and scannable HTML report.
+
+    ``embedded`` leaves out the page heading, for showing the report inside
+    the web interface, which already has one.
+    """
+    target = html.escape(str(report["target"]))
+    names = [name for name in report if name not in _METADATA_KEYS]
+    ordered = [name for name in SECTION_ORDER if name in names] + [
+        name for name in names if name not in SECTION_ORDER
+    ]
+    sections = "".join(
+        f'<section class="panel"><h2>{html.escape(_section_title(name))}</h2>{_render_value(report[name])}</section>'
+        for name in ordered
+    )
+    heading = "" if embedded else "<h1>Minimal Recon</h1>"
     return (
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
-        f"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>{title}</title>"
-        f"<style>{_STYLE}</style></head><body><main class=\"wrap\"><h1>Minimal Recon</h1>"
-        f"<div class=\"meta\"><strong>{title}</strong><br>"
-        f"Generated: {html.escape(str(report.get('generated_at', 'unknown')))}"
-        f" &middot; Tool version: {html.escape(str(report.get('tool_version', 'unknown')))}</div>"
-        f"<div class=\"summary\">{summary}</div>{''.join(sections)}</main></body></html>"
+        f"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        f"<title>Minimal Recon report: {target}</title>"
+        f"<style>{_STYLE}</style></head><body><main class=\"wrap{' embedded' if embedded else ''}\">{heading}"
+        f"<div class=\"meta\"><strong class=\"target\">{target}</strong>"
+        f"<span>Generated {html.escape(_format_timestamp(report.get('generated_at')))}"
+        f" &middot; Minimal Recon {html.escape(str(report.get('tool_version', '')))}</span></div>"
+        f"<div class=\"summary\">{_summary_cards(report)}</div>{sections}</main></body></html>"
     )
+
+
+def _format_timestamp(value: Any) -> str:
+    """``2026-11-18T11:20:40.94+00:00`` -> ``18 Nov 2026, 11:20 UTC``."""
+    try:
+        moment = datetime.fromisoformat(str(value)).astimezone(timezone.utc)
+    except (TypeError, ValueError):
+        return str(value or "unknown")
+    return moment.strftime("%d %b %Y, %H:%M UTC").lstrip("0")
 
 
 _STYLE = "".join(
@@ -127,10 +148,11 @@ _STYLE = "".join(
         "--bad:#b42318;--code:#334155}}",
         "*{box-sizing:border-box}",
         "body{margin:0;background:var(--bg);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif}",
-        ".wrap{max-width:1180px;margin:0 auto;padding:36px 20px 64px}",
+        ".wrap{max-width:1180px;margin:0 auto;padding:36px 20px 64px}.wrap.embedded{padding:22px 22px 28px}",
         "h1{font-size:34px;margin:0 0 8px}h2{font-size:18px;margin:0 0 16px}",
-        ".meta{color:var(--muted);margin-bottom:28px}",
-        ".summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:18px 0 26px}",
+        ".meta{color:var(--muted);margin-bottom:20px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px}",
+        ".meta .target{color:var(--text);font-size:22px}",
+        ".summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:12px;margin:0 0 22px}",
         ".card,.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}",
         ".card{padding:16px}.card strong{display:block;font-size:24px;color:var(--accent)}",
         ".card span{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}",
@@ -141,11 +163,12 @@ _STYLE = "".join(
         "table{border-collapse:collapse;width:100%;font-size:14px}",
         "th,td{text-align:left;vertical-align:top;padding:6px 10px;border-bottom:1px solid var(--line)}",
         "th{color:var(--muted);font-weight:600;white-space:nowrap}td{overflow-wrap:anywhere}",
+        ".kv>tbody>tr>th{width:1%;padding-right:24px}",
         "tr:last-child>th,tr:last-child>td{border-bottom:0}",
         "td ul{margin:0;padding-left:18px}.muted{color:var(--muted)}",
         ".status{display:inline-block;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700}",
         ".card strong.good,.good{color:var(--good)}.card strong.warn,.warn{color:var(--warn)}",
-        ".card strong.bad,.bad{color:var(--bad)}",
+        ".card strong.bad,.bad{color:var(--bad)}.card strong.info{color:var(--accent)}",
         "a{color:var(--accent);overflow-wrap:anywhere}details{margin-top:12px}summary{cursor:pointer;color:var(--muted)}",
         "@media(max-width:600px){.wrap{padding:24px 12px 40px}h1{font-size:28px}.panel{padding:15px}}",
     )
@@ -189,7 +212,7 @@ def _card_metric(name: str, value: Any) -> "tuple[str, str]":
         return "N/A", "warn"
     if name == "username_footprint" and isinstance(value, list):
         found = sum(1 for item in value if isinstance(item, dict) and item.get("found"))
-        return f"{found} found", "good"
+        return f"{found} found", "info"
     if not isinstance(value, dict):
         return "OK", "good"
     if name == "tls":
@@ -208,9 +231,9 @@ def _card_metric(name: str, value: Any) -> "tuple[str, str]":
         missing = len(value.get("missing_security_headers") or [])
         return (f"{missing} missing", "warn") if missing else ("OK", "good")
     if name == "subdomains":
-        return str(len(value.get("subdomains", []))), "good"
+        return str(len(value.get("subdomains", []))), "info"
     if name == "links":
-        return str(value.get("links_found", 0)), "good"
+        return str(value.get("links_found", 0)), "info"
     return "OK", "good"
 
 
@@ -233,7 +256,7 @@ def _render_structured(value: Any) -> str:
             f"<tr><th>{html.escape(_label(key))}</th><td>{_render_structured(item)}</td></tr>"
             for key, item in value.items()
         )
-        return f"<table>{rows}</table>"
+        return f'<table class="kv">{rows}</table>'
     if isinstance(value, (list, tuple)):
         if not value:
             return '<span class="muted">none</span>'

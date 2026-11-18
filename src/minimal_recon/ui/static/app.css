@@ -194,11 +194,13 @@ a { color: var(--accent); }
 
 .report-actions { display: flex; gap: 8px; margin: 8px 0; }
 .report-frame {
+  display: block;
   width: 100%;
   height: 75vh;
+  min-height: 240px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #0b1120;
+  background: var(--bg);
 }
 
 .table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
@@ -284,3 +286,10 @@ button.danger:hover { border-color: var(--bad); color: var(--bad); }
 .clamp-4 { -webkit-line-clamp: 4; line-clamp: 4; }
 .nowrap { white-space: nowrap; }
 .output > h2 + .changes, #history-output .changes { margin-top: 4px; }
+
+.clamp-1 { -webkit-line-clamp: 1; line-clamp: 1; }
+.clamp-3 { -webkit-line-clamp: 3; line-clamp: 3; }
+.page-summary { margin-top: 8px; font-size: 14px; }
+.page-summary p { margin: 0; }
+.page-title { font-weight: 600; }
+.page-description { color: var(--muted); margin-top: 4px !important; }

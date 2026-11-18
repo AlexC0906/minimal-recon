@@ -183,7 +183,11 @@ def api_report(payload: Dict[str, Any]) -> Dict[str, Any]:
     if username:
         footprint_service.validate_username(username)
     report = report_service.build_report(domain, username, footprint_details=bool(payload.get("details")))
-    result: Dict[str, Any] = {"report": report, "html": report_service.render_html(report)}
+    result: Dict[str, Any] = {
+        "report": report,
+        "html": report_service.render_html(report),
+        "preview_html": report_service.render_html(report, embedded=True),
+    }
     if payload.get("save"):
         entry = history_service.save(
             "report", str(report["target"]), report, history_service.summarize_report(report)
@@ -206,6 +210,7 @@ def api_history_get(payload: Dict[str, Any]) -> Dict[str, Any]:
     result: Dict[str, Any] = {"entry": asdict(entry), "data": data}
     if entry.kind == "report" and isinstance(data, dict):
         result["html"] = report_service.render_html(data)
+        result["preview_html"] = report_service.render_html(data, embedded=True)
     return result
 
 

@@ -157,3 +157,33 @@ def test_build_report_runs_sections_concurrently(monkeypatch):
     assert result["whois"] == {"domain": "example.test"}
     assert result["archive"] == {"snapshots": []}
     assert result["geoip"] == [{"ip": "192.0.2.10"}, {"ip": "192.0.2.11"}]
+
+
+def test_render_html_orders_sections_and_formats_the_timestamp():
+    rendered = report.render_html(
+        {
+            "target": "example.test",
+            "generated_at": "2026-11-18T11:20:40.945408+00:00",
+            "lookup": {"target": "example.test"},
+            "tls": {"days_until_expiry": 40},
+        }
+    )
+
+    assert "Generated 18 Nov 2026, 11:20 UTC" in rendered
+    assert rendered.index("<h2>TLS</h2>") < rendered.index("<h2>Lookup</h2>")
+    assert '<table class="kv">' in rendered
+
+
+def test_embedded_report_has_no_page_heading():
+    content = {"target": "example.test", "generated_at": "not a date"}
+
+    assert "<h1>" in report.render_html(content)
+    embedded = report.render_html(content, embedded=True)
+    assert "<h1>" not in embedded
+    assert "Generated not a date" in embedded
+
+
+def test_count_cards_are_neutral():
+    rendered = report.render_html({"target": "example.test", "links": {"links_found": 0}})
+
+    assert '<strong class="info">0</strong>' in rendered

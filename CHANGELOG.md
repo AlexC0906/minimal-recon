@@ -6,6 +6,20 @@ All notable changes to Minimal Recon are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The HTML report lists the sections that usually need attention first (TLS, email
+  spoofing, web headers), shows a readable generation time, keeps all summary cards on
+  one row and colours counts (subdomains, links) as neutral information.
+- The web interface shows reports without a second page heading and sizes them to their
+  content, so there is a single scroll bar.
+- Username cards list found profiles first, explain misses in plain words ("No account at
+  this address (HTTP 404)"), and show a page's title and description as a short summary.
+- GitHub statistics are named `repos` and `gists` instead of `public_repos` and
+  `public_gists` in footprint results.
+- README screenshots show every kind of result, follow GitHub's light or dark theme, and
+  include an animation of live results.
+
 ## [0.2.0] - 2026-11-18
 
 A local web interface, a rebuilt username footprint, saved history with change
