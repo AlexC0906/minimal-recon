@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from minimal_recon.services.dns import normalize_domain
-
+from minimal_recon.services.http import with_client
 
 RDAP_URL = "https://rdap.org/domain/{domain}"
 
@@ -49,10 +49,7 @@ def lookup_whois(domain: str, client: Optional[httpx.Client] = None) -> WhoisRes
             source,
         )
 
-    if client is not None:
-        return request(client)
-    with httpx.Client(timeout=10, follow_redirects=True) as active_client:
-        return request(active_client)
+    return with_client(request, client, timeout=10)
 
 
 def _find_registrar(entities: List[Dict[str, Any]]) -> Optional[str]:

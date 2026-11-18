@@ -32,3 +32,17 @@ def test_create_token_has_expected_prefix():
 def test_verify_urls_rejects_invalid_input(urls, token):
     with pytest.raises(ValueError):
         verify_urls(urls, token, client=FakeClient())
+
+
+def test_verify_urls_validates_all_urls_before_requesting():
+    class RecordingClient(FakeClient):
+        calls = 0
+
+        def get(self, url):
+            RecordingClient.calls += 1
+            return super().get(url)
+
+    with pytest.raises(ValueError):
+        verify_urls(["https://one.example", "ftp://two.example"], "token", client=RecordingClient())
+
+    assert RecordingClient.calls == 0

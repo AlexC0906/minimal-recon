@@ -39,6 +39,6 @@ def _is_image(path: Path) -> bool:
     try:
         with Image.open(path) as image:
             image.verify()
-    except (OSError, SyntaxError):
+    except (OSError, SyntaxError, ValueError, Image.DecompressionBombError):
         return False
     return True

@@ -20,4 +20,5 @@ def test_discover_public_files_checks_only_standard_paths():
     assert results[0].path == "/robots.txt"
     assert results[0].found is True
     assert results[0].size_bytes > 0
-    assert all(result.path in {"/robots.txt", "/sitemap.xml", "/security.txt", "/.well-known/security.txt", "/humans.txt"} for result in results)
+    expected_paths = {"/robots.txt", "/sitemap.xml", "/security.txt", "/.well-known/security.txt", "/humans.txt"}
+    assert all(result.path in expected_paths for result in results)

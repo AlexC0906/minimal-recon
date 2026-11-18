@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="api-token" content="__API_TOKEN__">
+  <title>Minimal Recon</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">&#9673;</span>
+      <span>Minimal Recon</span>
+      <span class="version" id="version"></span>
+    </div>
+    <nav class="tabs" role="tablist" id="tabs">
+      <button class="tab active" role="tab" aria-selected="true" data-tab="username">Username</button>
+      <!-- tool tabs are added by app.js -->
+      <button class="tab" role="tab" aria-selected="false" data-tab="rules">Rules</button>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="panel" id="tab-username">
+      <form id="footprint-form" class="search">
+        <label class="field grow">
+          <span>Usernames</span>
+          <input id="usernames" name="usernames" autocomplete="off" spellcheck="false"
+                 placeholder="e.g. octocat  (several: separate with spaces or commas)" required>
+        </label>
+        <button type="submit" class="primary" id="footprint-submit">Search</button>
+      </form>
+
+      <div class="options">
+        <label class="check"><input type="checkbox" id="opt-details" checked> Profile details</label>
+        <label class="check"><input type="checkbox" id="opt-found-only" checked> Found only</label>
+        <details class="sites-picker">
+          <summary>Sites: <span id="sites-count">all</span></summary>
+          <div class="sites-actions">
+            <button type="button" class="link" id="sites-all">Select all</button>
+            <button type="button" class="link" id="sites-none">Clear</button>
+          </div>
+          <div class="sites-grid" id="sites-grid"></div>
+        </details>
+        <details class="advanced">
+          <summary>More options</summary>
+          <label class="field">
+            <span>Extra Mastodon servers</span>
+            <input id="opt-mastodon" placeholder="fosstodon.org, infosec.exchange" spellcheck="false">
+          </label>
+          <label class="field">
+            <span>Self-audit token (your own accounts only)</span>
+            <input id="opt-audit" placeholder="minimal-recon-verify-..." spellcheck="false">
+          </label>
+        </details>
+      </div>
+
+      <div class="status" id="footprint-status" role="status" aria-live="polite"></div>
+      <div id="footprint-results"></div>
+      <p class="hint" id="footprint-empty">
+        Enter a username to check it on every site in the registry. A match only means the
+        name is taken on that site &mdash; compare names, bios and photos before treating two
+        accounts as the same person.
+      </p>
+    </section>
+
+    <!-- tool panels are added by app.js before the rules panel -->
+
+    <section class="panel hidden" id="tab-rules">
+      <div class="search">
+        <p class="grow">Checks every site rule against a username known to exist and one known not to,
+          so you can see which rules a site change has broken.</p>
+        <button type="button" class="primary" id="selftest-run">Run self-test</button>
+      </div>
+      <div class="status" id="selftest-status" role="status" aria-live="polite"></div>
+      <div id="selftest-results"></div>
+    </section>
+  </main>
+</body>
+</html>

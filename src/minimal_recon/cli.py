@@ -4,31 +4,40 @@ from dataclasses import asdict, is_dataclass
 import json
 from pathlib import Path
 import ssl
-from typing import Any
+from typing import Any, List, NoReturn, Optional
 
-import typer
 import httpx
-
-from minimal_recon.services.dns import enumerate_dns, summarize_dns
-from minimal_recon.services.email import analyze_email
-from minimal_recon.services.footprint import check_username
-from minimal_recon.services.lookup import lookup_target
-from minimal_recon.services.metadata import extract_metadata
-from minimal_recon.services.web import check_web
-from minimal_recon.services.subdomains import enumerate_subdomains
-from minimal_recon.services.report import build_report, write_report
-from minimal_recon.services.whois import lookup_whois
-from minimal_recon.services.geoip import geolocate_ip
-from minimal_recon.services.archive import enumerate_archive
-from minimal_recon.services.verification import create_token, verify_urls
-from minimal_recon.services.threatintel import check_reputation
-from minimal_recon.services.tls import inspect_tls
-from minimal_recon.services.shodan import lookup_host
-from minimal_recon.services.links import extract_links
-from minimal_recon.services.antispoofing import analyze_anti_spoofing
-from minimal_recon.services.public_files import discover_public_files
+import typer
 
 from minimal_recon import __version__
+from minimal_recon.services.antispoofing import analyze_anti_spoofing
+from minimal_recon.services.archive import enumerate_archive
+from minimal_recon.services.diff import diff_reports, load_report
+from minimal_recon.services.dns import enumerate_dns, summarize_dns
+from minimal_recon.services.email import analyze_email
+from minimal_recon.services.footprint import (
+    SITES,
+    FootprintResult,
+    check_username,
+    load_registry,
+    mastodon_rule,
+    run_self_test,
+    search_links,
+)
+from minimal_recon.services.geoip import geolocate_ip
+from minimal_recon.services.http import configure
+from minimal_recon.services.links import extract_links
+from minimal_recon.services.lookup import lookup_target
+from minimal_recon.services.metadata import extract_metadata
+from minimal_recon.services.public_files import discover_public_files
+from minimal_recon.services.report import build_report, write_report
+from minimal_recon.services.shodan import lookup_host
+from minimal_recon.services.subdomains import enumerate_subdomains
+from minimal_recon.services.threatintel import check_reputation
+from minimal_recon.services.tls import inspect_tls
+from minimal_recon.services.verification import create_token, verify_urls
+from minimal_recon.services.web import check_web
+from minimal_recon.services.whois import lookup_whois
 
 app = typer.Typer(help="Read-only OSINT reconnaissance utilities.")
 
@@ -48,14 +57,21 @@ def main(
         is_eager=True,
         help="Show the installed version and exit.",
     ),
+    timeout: Optional[float] = typer.Option(
+        None,
+        "--timeout",
+        min=0.1,
+        help="Seconds to wait on each HTTP, DNS and TLS operation instead of the per-command defaults.",
+    ),
 ) -> None:
     """Read-only OSINT reconnaissance utilities."""
+    configure(timeout)
 
 
 def emit(data: Any, as_json: bool) -> None:
     """Print a result in human-readable or automation-friendly form."""
     if as_json:
-        payload = asdict(data) if is_dataclass(data) else data
+        payload = asdict(data) if is_dataclass(data) and not isinstance(data, type) else data
         typer.echo(json.dumps(payload, indent=2, sort_keys=True))
         return
     if isinstance(data, dict):
@@ -64,7 +80,7 @@ def emit(data: Any, as_json: bool) -> None:
                 typer.echo(f"{key}: {value}")
 
 
-def handle_error(error: Exception) -> None:
+def handle_error(error: Exception) -> NoReturn:
     if isinstance(error, httpx.TimeoutException):
         message = "network timeout"
     elif isinstance(error, httpx.HTTPStatusError):
@@ -230,6 +246,10 @@ def tls_check(
     typer.echo(f"Issuer: {result.issuer}")
     typer.echo(f"Expires: {result.not_after or 'unknown'}")
     typer.echo(f"Days until expiry: {result.days_until_expiry}")
+    if result.verified:
+        typer.echo("Certificate valid: yes")
+    else:
+        typer.echo(f"Certificate valid: NO ({result.verification_error})")
 
 
 @app.command("shodan")
@@ -315,31 +335,173 @@ def public_files_check(url: str, as_json: bool = typer.Option(False, "--json")) 
         typer.echo(f"{status} {result.url} ({result.status_code or 'request error'})")
 
 
+FOOTPRINT_LABELS = {
+    "found": "FOUND",
+    "not_found": "NOT FOUND",
+    "unknown": "UNKNOWN",
+    "rate_limited": "RATE LIMITED",
+    "not_applicable": "N/A",
+}
+
+PROFILE_LABELS = {
+    "display_name": "Name",
+    "bio": "Bio",
+    "location": "Location",
+    "website": "Website",
+    "created_at": "Joined",
+    "declared_accounts": "Self-declared accounts (not verified)",
+    "stats": "Public stats",
+}
+
+
 @app.command()
 def footprint(
-    username: str,
+    usernames: Optional[List[str]] = typer.Argument(
+        None, help="One or more usernames to check. Not needed with --self-test."
+    ),
     as_json: bool = typer.Option(False, "--json"),
-    delay: float = typer.Option(0.2, "--delay", min=0, help="Seconds between site requests."),
+    delay: float = typer.Option(0.2, "--delay", min=0, help="Seconds between requests to the same host."),
+    sites_file: Optional[Path] = typer.Option(
+        None, "--sites", help="JSON site registry to use instead of the bundled one."
+    ),
+    only: List[str] = typer.Option([], "--site", help="Check only this site (repeatable)."),
+    self_test: bool = typer.Option(
+        False, "--self-test", help="Check every rule against its known present and absent usernames."
+    ),
+    details: bool = typer.Option(
+        False,
+        "--details",
+        help="Also show self-published profile fields and public stats from site APIs.",
+    ),
+    mastodon_servers: List[str] = typer.Option(
+        [], "--mastodon", help="Also check this Mastodon server, e.g. fosstodon.org (repeatable)."
+    ),
+    audit_token: Optional[str] = typer.Option(
+        None,
+        "--audit-token",
+        help="Self-audit your own accounts: a token from `recon verify-token` that you placed in your profiles.",
+    ),
+    found_only: bool = typer.Option(
+        False, "--found-only", help="Show only sites where the username was found (all sites are still checked)."
+    ),
 ) -> None:
-    """Check a username against a small, explicit public-site registry."""
+    """Check one or more usernames against an explicit registry of public sites."""
     try:
-        results = check_username(username, delay_seconds=delay)
-    except ValueError as error:
+        registry = load_registry(sites_file) if sites_file else dict(SITES)
+        if only:
+            unknown_sites = sorted(set(only) - set(registry))
+            if unknown_sites:
+                raise ValueError(f"unknown site(s): {', '.join(unknown_sites)}")
+            registry = {name: rule for name, rule in registry.items() if name in only}
+        if mastodon_servers:
+            base = registry.get("mastodon", SITES["mastodon"])
+            for server in mastodon_servers:
+                rule = mastodon_rule(server, base)
+                registry[rule.name] = rule
+        if self_test:
+            report = run_self_test(registry)
+        elif not usernames:
+            raise ValueError("a username is required unless --self-test is used")
+        else:
+            runs = [
+                (
+                    username,
+                    check_username(
+                        username, sites=registry, delay_seconds=delay, details=details, audit_token=audit_token
+                    ),
+                )
+                for username in dict.fromkeys(usernames)
+            ]
+    except (OSError, ValueError) as error:
         handle_error(error)
-    if as_json:
-        emit([asdict(result) for result in results], as_json=True)
+
+    if self_test:
+        if as_json:
+            emit(report, as_json=True)
+            return
+        for entry in report:
+            outcome = f"present={entry['present']}, absent={entry['absent']}"
+            typer.echo(f"{entry['site']}: {entry['status'].upper()} ({outcome})")
+        broken = sum(1 for entry in report if entry["status"] == "broken")
+        typer.echo(f"{len(report) - broken} of {len(report)} rules not broken.")
         return
+
+    if as_json:
+        if found_only:
+            runs = [(username, [result for result in results if result.found]) for username, results in runs]
+        if len(runs) == 1:
+            emit([asdict(result) for result in runs[0][1]], as_json=True)
+        else:
+            payload = [
+                {"username": username, "results": [asdict(result) for result in results]} for username, results in runs
+            ]
+            emit(payload, as_json=True)
+        return
+    for position, (username, results) in enumerate(runs):
+        if len(runs) > 1:
+            typer.echo(("\n" if position else "") + f"=== {username}")
+        _print_footprint(results, audit=audit_token is not None, found_only=found_only)
+
+
+def _print_footprint(results: List[FootprintResult], audit: bool, found_only: bool = False) -> None:
     for result in results:
-        status = {
-            "found": "FOUND",
-            "not_found": "NOT FOUND",
-            "unknown": "UNKNOWN",
-        }[result.state]
-        typer.echo(f"{result.site}: {status} {result.url}")
+        if found_only and not result.found:
+            continue
+        status = FOOTPRINT_LABELS.get(result.state, result.state.upper())
+        confidence = f" [{result.confidence}]" if result.confidence else ""
+        origin = f" (declared on {result.discovered_from})" if result.discovered_from else ""
+        typer.echo(f"{result.site}: {status} {result.url}{confidence}{origin}")
+        if audit and result.found:
+            typer.echo(f"  Audit token: {'found - verified as yours' if result.owner_verified else 'not found'}")
         if result.found and result.page_title:
             typer.echo(f"  Title: {result.page_title}")
         if result.found and result.meta_description:
             typer.echo(f"  Description: {result.meta_description}")
+        for name, value in result.profile.items():
+            if isinstance(value, dict):
+                value = ", ".join(f"{label}: {item}" for label, item in value.items())
+            typer.echo(f"  {PROFILE_LABELS.get(name, name)}: {value}")
+        if result.profile_note:
+            typer.echo(f"  Details: {result.profile_note}")
+    found = sum(1 for result in results if result.found)
+    undecided = sum(1 for result in results if result.state in ("unknown", "rate_limited"))
+    typer.echo(f"Found on {found} of {len(results)} sites; {undecided} could not be determined.")
+    if audit:
+        verified = sum(1 for result in results if result.owner_verified)
+        typer.echo(f"Verified as yours: {verified} profile(s).")
+
+
+@app.command("ui")
+def ui_command(
+    port: int = typer.Option(8765, "--port", min=0, max=65535, help="Local port; 0 picks a free one."),
+    no_browser: bool = typer.Option(False, "--no-browser", help="Do not open the browser automatically."),
+) -> None:
+    """Open the local web interface (served on 127.0.0.1 only)."""
+    from minimal_recon.ui.server import serve
+
+    try:
+        serve(port, open_browser=not no_browser, announce=typer.echo)
+    except OSError as error:
+        handle_error(OSError(f"could not start the interface on port {port}: {error.strerror or error}"))
+
+
+@app.command("search-links")
+def search_links_command(username: str, as_json: bool = typer.Option(False, "--json")) -> None:
+    """Print web-search and Wayback links for manual review. Sends no requests."""
+    try:
+        links = search_links(username)
+    except ValueError as error:
+        handle_error(error)
+    if as_json:
+        emit(links, as_json=True)
+        return
+    typer.echo(f"Username: {links['username']}")
+    typer.echo("Exact-match web searches:")
+    for engine, url in links["search_engines"].items():
+        typer.echo(f"  {engine}: {url}")
+    typer.echo("Wayback Machine history of each possible profile:")
+    for site, url in links["archived_profiles"].items():
+        typer.echo(f"  {site}: {url}")
 
 
 @app.command("email")
@@ -392,7 +554,7 @@ def subdomain_enumeration(domain: str, as_json: bool = typer.Option(False, "--js
     """Discover public in-scope subdomains from certificate logs."""
     try:
         result = enumerate_subdomains(domain)
-    except (OSError, ValueError) as error:
+    except (httpx.HTTPError, OSError, ValueError) as error:
         handle_error(error)
     if as_json:
         emit(result, as_json=True)
@@ -410,12 +572,15 @@ def report_command(
     email: str = typer.Option("", "--email"),
     output: Path = typer.Option(None, "--output", help="Write a JSON report to this path."),
     html_output: Path = typer.Option(None, "--html", help="Write an HTML report to this path."),
+    details: bool = typer.Option(
+        False, "--details", help="Include self-published profile fields in the username footprint."
+    ),
 ) -> None:
     """Build a consolidated passive OSINT report."""
     try:
-        result = build_report(domain, username or None, email or None)
+        result = build_report(domain, username or None, email or None, footprint_details=details)
         write_report(result, output, html_output)
-    except (OSError, ValueError) as error:
+    except (httpx.HTTPError, OSError, ValueError) as error:
         handle_error(error)
     if not output and not html_output:
         typer.echo(json.dumps(result, indent=2, sort_keys=True))
@@ -424,6 +589,50 @@ def report_command(
             typer.echo(f"JSON report: {output}")
         if html_output:
             typer.echo(f"HTML report: {html_output}")
+
+
+@app.command("diff")
+def diff_command(
+    old: Path = typer.Argument(..., help="Earlier JSON report."),
+    new: Path = typer.Argument(..., help="Later JSON report."),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Compare two saved JSON reports without making any network request."""
+    try:
+        old_report = load_report(old)
+        new_report = load_report(new)
+    except (OSError, ValueError) as error:
+        handle_error(error)
+    changes = diff_reports(old_report, new_report)
+    if as_json:
+        emit(
+            {
+                "target": new_report.get("target"),
+                "old_generated_at": old_report.get("generated_at"),
+                "new_generated_at": new_report.get("generated_at"),
+                "changes": [asdict(change) for change in changes],
+            },
+            as_json=True,
+        )
+        return
+    typer.echo(f"Target: {new_report.get('target')}")
+    typer.echo(f"Compared: {old_report.get('generated_at', 'unknown')} -> {new_report.get('generated_at', 'unknown')}")
+    if not changes:
+        typer.echo("No changes.")
+        return
+    for change in changes:
+        if change.change == "added":
+            typer.echo(f"+ {change.path}: {_compact(change.new)}")
+        elif change.change == "removed":
+            typer.echo(f"- {change.path}: {_compact(change.old)}")
+        else:
+            typer.echo(f"~ {change.path}: {_compact(change.old)} -> {_compact(change.new)}")
+    typer.echo(f"{len(changes)} change(s).")
+
+
+def _compact(value: Any) -> str:
+    """Render one diff value on a single line."""
+    return value if isinstance(value, str) else json.dumps(value, sort_keys=True, default=str)
 
 
 @app.command()

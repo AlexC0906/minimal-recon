@@ -1,12 +1,12 @@
 """Passive subdomain discovery from Certificate Transparency logs."""
 
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional
 
 import httpx
 
 from minimal_recon.services.dns import normalize_domain
-
+from minimal_recon.services.http import with_client
 
 CRT_SH_URL = "https://crt.sh/?q=%25.{domain}&output=json"
 
@@ -33,19 +33,23 @@ def enumerate_subdomains(
         except ValueError as error:
             raise ValueError("Certificate Transparency returned invalid JSON") from error
 
+        if not isinstance(certificates, list):
+            raise ValueError("Certificate Transparency returned an unexpected response")
+
         suffix = f".{domain}"
         names = set()
         for certificate in certificates:
+            if not isinstance(certificate, dict):
+                continue
             for name in str(certificate.get("name_value", "")).splitlines():
-                name = name.strip().lower().lstrip("*.")
+                name = name.strip().lower()
+                if name.startswith("*."):
+                    name = name[2:]
                 if name == domain or name.endswith(suffix):
                     names.add(name)
         return SubdomainResult(domain, sorted(names), source)
 
-    if client is not None:
-        return request(client)
-    with httpx.Client(timeout=10, follow_redirects=True) as active_client:
-        return request(active_client)
+    return with_client(request, client, timeout=10)
 
 
 def subdomains_to_dict(result: SubdomainResult) -> Dict[str, Any]:

@@ -28,3 +28,12 @@ def test_enumerate_subdomains_filters_and_deduplicates_names():
 def test_enumerate_subdomains_validates_domain(domain):
     with pytest.raises(ValueError):
         enumerate_subdomains(domain, client=FakeClient())
+
+
+def test_enumerate_subdomains_rejects_unexpected_payload():
+    class ErrorPayloadClient:
+        def get(self, url):
+            return httpx.Response(200, json={"error": "busy"}, request=httpx.Request("GET", url))
+
+    with pytest.raises(ValueError):
+        enumerate_subdomains("example.test", client=ErrorPayloadClient())

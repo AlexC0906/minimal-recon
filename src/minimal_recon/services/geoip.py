@@ -2,10 +2,11 @@
 
 from dataclasses import dataclass
 import ipaddress
-from typing import Any, Dict, Optional
+from typing import Optional
 
 import httpx
 
+from minimal_recon.services.http import with_client
 
 GEOIP_URL = "https://ipwho.is/{ip}"
 
@@ -54,7 +55,4 @@ def geolocate_ip(ip: str, client: Optional[httpx.Client] = None) -> GeoIpResult:
             source,
         )
 
-    if client is not None:
-        return request(client)
-    with httpx.Client(timeout=10, follow_redirects=True) as active_client:
-        return request(active_client)
+    return with_client(request, client, timeout=10)

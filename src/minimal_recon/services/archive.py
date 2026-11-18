@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from minimal_recon.services.dns import normalize_domain
-
+from minimal_recon.services.http import with_client
 
 CDX_URL = "https://web.archive.org/cdx/search/cdx"
 
@@ -71,10 +71,7 @@ def enumerate_archive(
             )
         return ArchiveResult(domain, snapshots, CDX_URL)
 
-    if client is not None:
-        return request(client)
-    with httpx.Client(timeout=15, follow_redirects=True) as active_client:
-        return request(active_client)
+    return with_client(request, client, timeout=15)
 
 
 def archive_to_dict(result: ArchiveResult) -> Dict[str, Any]:

@@ -2,11 +2,16 @@
 
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+import ipaddress
 import socket
 import ssl
 from typing import Any, Dict, Optional
 
+import certifi
+from cryptography import x509
+
 from minimal_recon.services.dns import normalize_domain
+from minimal_recon.services.http import resolve_timeout
 
 
 @dataclass(frozen=True)
@@ -21,52 +26,88 @@ class TlsResult:
     not_after: Optional[str]
     days_until_expiry: Optional[int]
     certificate_source: str
+    verified: bool = True
+    verification_error: Optional[str] = None
 
 
-def inspect_tls(hostname: str, port: int = 443, timeout: float = 5.0) -> TlsResult:
-    """Inspect one TLS endpoint without sending application data."""
-    hostname = normalize_domain(hostname.lower())
+def inspect_tls(hostname: str, port: int = 443, timeout: Optional[float] = None) -> TlsResult:
+    """Inspect one TLS endpoint without sending application data.
+
+    A certificate that fails validation (expired, self-signed, wrong host) is
+    still reported, with ``verified=False`` and the validation error.
+    """
+    try:
+        hostname = str(ipaddress.ip_address(hostname.strip()))
+    except ValueError:
+        hostname = normalize_domain(hostname.lower())
     if not 1 <= port <= 65535:
         raise ValueError("port must be between 1 and 65535")
+    if timeout is None:
+        timeout = resolve_timeout(5.0)
     if timeout <= 0:
         raise ValueError("timeout must be greater than zero")
 
+    # Trust the operating system store plus the Mozilla bundle used by the HTTP
+    # checks, so a stale local store does not mark a valid public chain invalid.
     context = ssl.create_default_context()
-    with socket.create_connection((hostname, port), timeout=timeout) as connection:
+    context.load_verify_locations(certifi.where())
+    try:
+        return _handshake(hostname, port, timeout, context, None)
+    except ssl.SSLCertVerificationError as error:
+        verification_error = error.verify_message or str(error)
+
+    # Second handshake with validation off, only to read the certificate that
+    # was just rejected. Nothing is sent over the connection.
+    unverified = ssl.create_default_context()
+    unverified.check_hostname = False
+    unverified.verify_mode = ssl.CERT_NONE
+    return _handshake(hostname, port, timeout, unverified, verification_error)
+
+
+def _handshake(
+    hostname: str,
+    port: int,
+    timeout: float,
+    context: ssl.SSLContext,
+    verification_error: Optional[str],
+) -> TlsResult:
+    try:
+        connection = socket.create_connection((hostname, port), timeout=timeout)
+    except socket.gaierror as error:
+        raise OSError(f"could not resolve {hostname}") from error
+    with connection:
         with context.wrap_socket(connection, server_hostname=hostname) as tls_socket:
-            certificate = tls_socket.getpeercert()
+            der = tls_socket.getpeercert(binary_form=True)
             cipher_info = tls_socket.cipher() or ("unknown", "", 0)
-            not_after = certificate.get("notAfter")
-            expiry = _parse_certificate_date(not_after)
-            days_until_expiry = (
-                (expiry - datetime.now(timezone.utc)).days if expiry else None
-            )
-            return TlsResult(
-                hostname,
-                port,
-                tls_socket.version() or "unknown",
-                cipher_info[0],
-                _flatten_name(certificate.get("subject", ())),
-                _flatten_name(certificate.get("issuer", ())),
-                certificate.get("notBefore"),
-                not_after,
-                days_until_expiry,
-                f"https://{hostname}:{port}/",
-            )
+            tls_version = tls_socket.version() or "unknown"
+    if not der:
+        raise OSError("server did not present a certificate")
+
+    certificate = x509.load_der_x509_certificate(der)
+    not_after = certificate.not_valid_after_utc
+    return TlsResult(
+        hostname,
+        port,
+        tls_version,
+        cipher_info[0],
+        _flatten_name(certificate.subject),
+        _flatten_name(certificate.issuer),
+        certificate.not_valid_before_utc.isoformat(),
+        not_after.isoformat(),
+        (not_after - datetime.now(timezone.utc)).days,
+        f"https://{_url_host(hostname)}:{port}/",
+        verification_error is None,
+        verification_error,
+    )
 
 
-def _parse_certificate_date(value: Optional[str]) -> Optional[datetime]:
-    if not value:
-        return None
-    return datetime.strptime(value, "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
+def _flatten_name(name: x509.Name) -> str:
+    """Render a certificate name as ``commonName=example.com, organizationName=...``."""
+    return ", ".join(f"{attribute.oid._name}={attribute.value!s}" for attribute in name)
 
 
-def _flatten_name(name: Any) -> str:
-    values = []
-    for section in name or ():
-        for key, value in section:
-            values.append(f"{key}={value}")
-    return ", ".join(values)
+def _url_host(hostname: str) -> str:
+    return f"[{hostname}]" if ":" in hostname else hostname
 
 
 def tls_to_dict(result: TlsResult) -> Dict[str, Any]:

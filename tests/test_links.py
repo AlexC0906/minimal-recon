@@ -30,3 +30,17 @@ def test_extract_links_normalizes_and_separates_links():
 def test_extract_links_rejects_invalid_url(url):
     with pytest.raises(ValueError):
         extract_links(url, client=FakeClient())
+
+
+def test_extract_links_skips_malformed_hrefs():
+    class MalformedClient:
+        def get(self, url):
+            return httpx.Response(
+                200,
+                text='<a href="http://[broken">Bad</a><a href="/ok">Ok</a>',
+                request=httpx.Request("GET", url),
+            )
+
+    result = extract_links("https://example.test/", client=MalformedClient())
+
+    assert result.internal_links == ["https://example.test/ok"]

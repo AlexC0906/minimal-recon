@@ -53,3 +53,17 @@ def test_summarize_dns_extracts_servers_and_provider_hints():
 def test_normalize_domain_rejects_invalid_names(domain):
     with pytest.raises(ValueError):
         normalize_domain(domain)
+
+
+@pytest.mark.parametrize(
+    "domain",
+    ["https://example.test", "example.test/path", "example.test?q=1", "-bad.example.test", "a" * 64 + ".test"],
+)
+def test_normalize_domain_rejects_urls_and_malformed_labels(domain):
+    with pytest.raises(ValueError):
+        normalize_domain(domain)
+
+
+def test_normalize_domain_accepts_service_labels_and_idn():
+    assert normalize_domain("_dmarc.example.test") == "_dmarc.example.test"
+    assert normalize_domain("bücher.example") == "xn--bcher-kva.example"

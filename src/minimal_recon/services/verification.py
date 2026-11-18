@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
+from minimal_recon.services.http import with_client
+from minimal_recon.services.web import validate_url
 
 TOKEN_PREFIX = "minimal-recon-verify-"
 
@@ -31,15 +33,19 @@ def verify_urls(
     """Check an exact token on explicitly supplied public URLs."""
     if not token.strip() or len(token) > 200:
         raise ValueError("token must be between 1 and 200 characters")
+    token = token.strip()
     if not urls:
         raise ValueError("at least one profile URL is required")
+    # Validate every URL before the first request so bad input never leaves
+    # the run half-finished.
+    try:
+        normalized_urls = [validate_url(url) for url in urls]
+    except ValueError as error:
+        raise ValueError("profile URLs must use http:// or https://") from error
 
     def collect(active_client: httpx.Client) -> List[VerificationResult]:
         results = []
-        for url in urls:
-            normalized = url.strip()
-            if not normalized.startswith(("https://", "http://")):
-                raise ValueError("profile URLs must use http:// or https://")
+        for normalized in normalized_urls:
             try:
                 response = active_client.get(normalized)
             except httpx.HTTPError as error:
@@ -50,10 +56,7 @@ def verify_urls(
             results.append(VerificationResult(normalized, verified, response.status_code, evidence))
         return results
 
-    if client is not None:
-        return collect(client)
-    with httpx.Client(follow_redirects=True, timeout=5) as active_client:
-        return collect(active_client)
+    return with_client(collect, client, timeout=5)
 
 
 def verification_to_dict(result: VerificationResult) -> Dict[str, Any]:

@@ -6,8 +6,8 @@ from urllib.parse import urljoin
 
 import httpx
 
+from minimal_recon.services.http import with_client
 from minimal_recon.services.web import validate_url
-
 
 STANDARD_PATHS = (
     "/robots.txt",
@@ -57,10 +57,7 @@ def discover_public_files(
             )
         return results
 
-    if client is not None:
-        return request(client)
-    with httpx.Client(follow_redirects=True, timeout=5) as active_client:
-        return request(active_client)
+    return with_client(request, client, timeout=5)
 
 
 def public_files_to_dict(results: List[PublicFileResult]) -> List[Dict[str, Any]]:

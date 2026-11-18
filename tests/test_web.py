@@ -53,3 +53,29 @@ def test_detect_waf_returns_not_detected_without_fingerprint():
 def test_validate_url_requires_http_scheme_and_host(url):
     with pytest.raises(ValueError):
         validate_url(url)
+
+
+def test_detect_waf_ignores_cdn_names_in_body_and_policy_headers():
+    headers = httpx.Headers(
+        {
+            "server": "nginx",
+            "content-security-policy": "script-src cdnjs.cloudflare.com *.cloudfront.net",
+            "x-cache": "HIT",
+        }
+    )
+    body = '<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>'
+
+    assert detect_waf(headers, body) == (None, (), "not_detected")
+
+
+def test_detect_waf_reads_identifying_header_values():
+    vendor, signals, _ = detect_waf(httpx.Headers({"x-cache": "Miss from cloudfront"}))
+
+    assert vendor == "AWS WAF/CloudFront"
+    assert signals == ("cloudfront",)
+
+
+def test_detect_technologies_reports_php_from_headers():
+    assert "PHP" in detect_technologies(httpx.Headers({"x-powered-by": "PHP/8.2"}))
+    assert "PHP" in detect_technologies(httpx.Headers({"set-cookie": "PHPSESSID=abc; path=/"}))
+    assert "PHP" not in detect_technologies(httpx.Headers({"server": "nginx"}))

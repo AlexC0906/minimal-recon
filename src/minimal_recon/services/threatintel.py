@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 import httpx
 
 from minimal_recon.services.dns import normalize_domain
-
+from minimal_recon.services.http import with_client
 
 VT_URL = "https://www.virustotal.com/api/v3/{resource}/{target}"
 
@@ -59,10 +59,7 @@ def check_reputation(
             "https://www.virustotal.com/",
         )
 
-    if client is not None:
-        return request(client)
-    with httpx.Client(timeout=10, follow_redirects=True) as active_client:
-        return request(active_client)
+    return with_client(request, client, timeout=10)
 
 
 def _normalize_target(target: str) -> tuple[str, str, str]:

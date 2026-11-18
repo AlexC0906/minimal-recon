@@ -5,6 +5,8 @@ import ipaddress
 import socket
 from typing import Optional, Tuple
 
+from minimal_recon.services.dns import normalize_domain
+
 
 @dataclass(frozen=True)
 class LookupResult:
@@ -16,12 +18,16 @@ class LookupResult:
 
 def lookup_target(target: str) -> LookupResult:
     """Resolve a domain or IP using the local resolver."""
+    target = target.strip()
     try:
         address = ipaddress.ip_address(target)
     except ValueError:
-        addresses = tuple(
-            sorted({item[4][0] for item in socket.getaddrinfo(target, None)})
-        )
+        target = normalize_domain(target)
+        try:
+            records = socket.getaddrinfo(target, None)
+        except socket.gaierror as error:
+            raise OSError(f"could not resolve {target}") from error
+        addresses = tuple(sorted({str(item[4][0]) for item in records}))
         return LookupResult(target, "domain", addresses)
 
     try:

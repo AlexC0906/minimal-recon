@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from minimal_recon.services.http import with_client
 
 SECURITY_HEADERS = (
     "strict-transport-security",
@@ -65,29 +66,33 @@ def check_web(url: str, client: Optional[httpx.Client] = None) -> WebCheckResult
             technologies,
         )
 
-    if client is not None:
-        return request(client)
-    with httpx.Client(follow_redirects=True, timeout=5) as active_client:
-        return request(active_client)
+    return with_client(request, client, timeout=5)
 
 
 def detect_waf(headers: httpx.Headers, body: str = "") -> tuple[Optional[str], tuple[str, ...], str]:
     """Infer a WAF vendor from passive response fingerprints only."""
+    # Only identifying headers are inspected. Page bodies and policy headers such
+    # as CSP routinely mention CDN hostnames (cdnjs.cloudflare.com, *.cloudfront.net)
+    # on sites that are not behind that vendor. ``body`` is kept for API
+    # compatibility and ignored.
     normalized_headers = {key.lower(): value.lower() for key, value in headers.items()}
-    normalized_body = body.lower()[:500_000]
+    identifying_values = [
+        normalized_headers.get(name, "")
+        for name in ("server", "via", "x-cache", "x-cdn", "x-served-by", "set-cookie")
+    ]
     fingerprints = {
         "Cloudflare": ("cf-ray", "cf-cache-status", "cloudflare"),
-        "AWS WAF/CloudFront": ("x-amzn-requestid", "x-cache", "cloudfront"),
-        "Akamai": ("akamai-grn", "x-akamai-transformed"),
-        "Imperva": ("incap_ses", "visid_incap"),
+        "AWS WAF/CloudFront": ("x-amz-cf-id", "x-amzn-waf-action", "cloudfront"),
+        "Akamai": ("akamai-grn", "x-akamai-transformed", "akamaighost"),
+        "Imperva": ("x-iinfo", "incap_ses", "visid_incap"),
         "Sucuri": ("x-sucuri-id", "sucuri/cloudproxy"),
-        "Fastly": ("fastly-debug-digest", "fastly"),
+        "Fastly": ("fastly-debug-digest", "x-fastly-request-id", "fastly"),
     }
     for vendor, markers in fingerprints.items():
         signals = tuple(
             marker
             for marker in markers
-            if marker in normalized_headers or any(marker in value for value in normalized_headers.values()) or marker in normalized_body
+            if marker in normalized_headers or any(marker in value for value in identifying_values)
         )
         if signals:
             return vendor, signals, "heuristic"
@@ -106,7 +111,6 @@ def detect_technologies(headers: httpx.Headers, body: str = "") -> Dict[str, tup
         "Next.js": ("/_next/", "__next_data__"),
         "Vue": ("vue.min.js", "data-v-"),
         "jQuery": ("jquery.min.js", "jquery-"),
-        "PHP": ("x-powered-by: php",),
     }
     detected: Dict[str, tuple[str, ...]] = {}
     for technology, markers in fingerprints.items():
@@ -122,4 +126,8 @@ def detect_technologies(headers: httpx.Headers, body: str = "") -> Dict[str, tup
         detected["Server"] = (normalized_headers["server"],)
     if "x-powered-by" in normalized_headers:
         detected["X-Powered-By"] = (normalized_headers["x-powered-by"],)
+        if "php" in normalized_headers["x-powered-by"]:
+            detected["PHP"] = ("x-powered-by",)
+    if "phpsessid" in normalized_headers.get("set-cookie", ""):
+        detected.setdefault("PHP", ("phpsessid cookie",))
     return detected

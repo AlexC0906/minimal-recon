@@ -1,0 +1,471 @@
+{
+  "_comment": "Footprint site registry. Placeholders: {username}, {username_lower}. See README 'Footprint registry format'. Every rule was checked against known_present and known_absent; re-run `recon footprint --self-test` to detect rules that broke.",
+  "sites": [
+    {
+      "name": "github",
+      "url": "https://github.com/{username}",
+      "probe_url": "https://api.github.com/users/{username}",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}",
+      "known_present": "octocat",
+      "known_absent": "zq7xk2vq9wplm3",
+      "profile_fields": {
+        "display_name": "name",
+        "bio": "bio",
+        "location": "location",
+        "website": "blog",
+        "created_at": "created_at",
+        "declared_accounts": {
+          "x": "twitter_username"
+        },
+        "stats": {
+          "public_repos": "public_repos",
+          "public_gists": "public_gists",
+          "followers": "followers"
+        }
+      }
+    },
+    {
+      "name": "gitlab",
+      "url": "https://gitlab.com/{username}",
+      "probe_url": "https://gitlab.com/api/v4/users?username={username}",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9_][A-Za-z0-9_.-]{1,254}",
+      "found_text": "\"username\":\"{username}\"",
+      "not_found_body": "[]",
+      "known_present": "gitlab-bot",
+      "known_absent": "zq7xk2vq9wplm3",
+      "profile_fields": {
+        "display_name": "0.name"
+      }
+    },
+    {
+      "name": "codeberg",
+      "url": "https://codeberg.org/{username}",
+      "probe_url": "https://codeberg.org/api/v1/users/{username}",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9_][A-Za-z0-9_.-]{0,39}",
+      "known_present": "forgejo",
+      "known_absent": "zq7xk2vq9wplm3",
+      "profile_fields": {
+        "display_name": "full_name",
+        "bio": "description",
+        "location": "location",
+        "website": "website",
+        "created_at": "created",
+        "stats": {
+          "followers": "followers_count"
+        }
+      }
+    },
+    {
+      "name": "devto",
+      "url": "https://dev.to/{username}",
+      "probe_url": "https://dev.to/api/users/by_username?url={username}",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9_]{1,30}",
+      "known_present": "ben",
+      "known_absent": "zq7xk2vq9wplm3",
+      "profile_fields": {
+        "display_name": "name",
+        "bio": "summary",
+        "location": "location",
+        "website": "website_url",
+        "created_at": "joined_at",
+        "declared_accounts": {
+          "x": "twitter_username",
+          "github": "github_username"
+        }
+      }
+    },
+    {
+      "name": "hackernews",
+      "url": "https://news.ycombinator.com/user?id={username}",
+      "probe_url": "https://hacker-news.firebaseio.com/v0/user/{username}.json",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9_-]{2,15}",
+      "not_found_body": "null",
+      "known_present": "pg",
+      "known_absent": "zq7xk2vq9wplm3",
+      "profile_fields": {
+        "bio": "about",
+        "created_at": "created",
+        "stats": {
+          "karma": "karma"
+        }
+      }
+    },
+    {
+      "name": "bluesky",
+      "url": "https://bsky.app/profile/{username_lower}.bsky.social",
+      "probe_url": "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={username_lower}.bsky.social",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9](?:[A-Za-z0-9-]{1,16}[A-Za-z0-9])",
+      "not_found_status": [
+        400,
+        404
+      ],
+      "not_found_text": "profile not found",
+      "known_present": "jay",
+      "known_absent": "zq7xk2vq9wplm3",
+      "profile_fields": {
+        "display_name": "displayName",
+        "bio": "description",
+        "created_at": "createdAt",
+        "stats": {
+          "followers": "followersCount",
+          "posts": "postsCount"
+        }
+      }
+    },
+    {
+      "name": "keybase",
+      "url": "https://keybase.io/{username}",
+      "probe_url": "https://keybase.io/_/api/1.0/user/lookup.json?usernames={username}",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9_]{2,16}",
+      "found_text": "\"basics\"",
+      "not_found_text": "\"them\":[null]",
+      "known_present": "chris",
+      "known_absent": "zq7xk2vq9wplm3",
+      "profile_fields": {
+        "display_name": "them.0.profile.full_name",
+        "bio": "them.0.profile.bio",
+        "location": "them.0.profile.location",
+        "created_at": "them.0.basics.ctime"
+      }
+    },
+    {
+      "name": "dockerhub",
+      "url": "https://hub.docker.com/u/{username_lower}",
+      "probe_url": "https://hub.docker.com/v2/users/{username_lower}/",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9]{4,30}",
+      "known_present": "library",
+      "known_absent": "zq7xk2vq9wplm3",
+      "profile_fields": {
+        "display_name": "full_name",
+        "location": "location",
+        "website": "profile_url",
+        "created_at": "date_joined"
+      }
+    },
+    {
+      "name": "lichess",
+      "url": "https://lichess.org/@/{username}",
+      "probe_url": "https://lichess.org/api/user/{username}",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9][A-Za-z0-9_-]{0,28}[A-Za-z0-9]",
+      "known_present": "thibault",
+      "known_absent": "zq7xk2vq9wplm3",
+      "profile_fields": {
+        "display_name": "profile.realName",
+        "bio": "profile.bio",
+        "created_at": "createdAt",
+        "declared_accounts": {
+          "links": "profile.links"
+        },
+        "stats": {
+          "games": "count.all"
+        }
+      }
+    },
+    {
+      "name": "chesscom",
+      "url": "https://www.chess.com/member/{username_lower}",
+      "probe_url": "https://api.chess.com/pub/player/{username_lower}",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9_-]{3,25}",
+      "known_present": "hikaru",
+      "known_absent": "zq7xk2vq9wplm3",
+      "profile_fields": {
+        "display_name": "name",
+        "location": "location",
+        "created_at": "joined",
+        "stats": {
+          "followers": "followers"
+        }
+      }
+    },
+    {
+      "name": "medium",
+      "url": "https://medium.com/@{username}",
+      "probe_url": "https://medium.com/feed/@{username}",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9_.]{1,30}",
+      "found_text": "<rss",
+      "known_present": "ev",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "x",
+      "url": "https://x.com/{username}",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9_]{1,15}",
+      "known_present": "github",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "instagram",
+      "url": "https://www.instagram.com/{username}/",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9._]{1,30}",
+      "found_text": "\"username\":\"{username}\"",
+      "not_found_text": "<title>instagram</title>",
+      "unknown_url": "/accounts/login",
+      "known_present": "natgeo",
+      "known_absent": "zq7xk2vq9wplm3",
+      "meta_pattern": "(?P<stats_followers>[\\d.,]+[KMB]?) Followers, (?P<stats_following>[\\d.,]+[KMB]?) Following, (?P<stats_posts>[\\d.,]+[KMB]?) Posts - (?:See Instagram photos and videos from )?(?P<display_name>.+?) \\(@[^)]+\\)(?: on Instagram: \\\"(?P<bio>.*?)\\\"?)?\\s*$"
+    },
+    {
+      "name": "tiktok",
+      "url": "https://www.tiktok.com/@{username}",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9._]{2,24}",
+      "found_text": "\"uniqueid\":\"{username}\"",
+      "not_found_text": "\"statuscode\":10221",
+      "known_present": "nba",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "pinterest",
+      "url": "https://www.pinterest.com/{username}/",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9_]{3,30}",
+      "found_text": "({username}) - profile | pinterest</title>",
+      "not_found_text": "<title></title>",
+      "known_present": "natgeo",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "twitch",
+      "url": "https://www.twitch.tv/{username}",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9][A-Za-z0-9_]{3,24}",
+      "found_text": "<title>{username} - twitch</title>",
+      "not_found_text": "<title>twitch</title>",
+      "known_present": "shroud",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "steam",
+      "url": "https://steamcommunity.com/id/{username}",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9_-]{2,32}",
+      "found_text": "g_rgprofiledata",
+      "not_found_text": "the specified profile could not be found",
+      "known_present": "robinwalker",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "telegram",
+      "url": "https://t.me/{username}",
+      "source": "html",
+      "username_pattern": "[A-Za-z][A-Za-z0-9_]{3,31}",
+      "found_text": "class=\"tgme_page_title\"",
+      "not_found_text": "content=\"telegram: contact @",
+      "known_present": "durov",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "youtube",
+      "url": "https://www.youtube.com/@{username}",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9._-]{3,30}",
+      "unknown_url": "consent.youtube.com",
+      "known_present": "youtube",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "mastodon",
+      "url": "https://mastodon.social/@{username}",
+      "probe_url": "https://mastodon.social/api/v1/accounts/lookup?acct={username}",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9_]{1,30}",
+      "opt_out_path": "noindex",
+      "profile_fields": {
+        "display_name": "display_name",
+        "bio": "note",
+        "created_at": "created_at",
+        "stats": {
+          "followers": "followers_count",
+          "posts": "statuses_count"
+        }
+      },
+      "known_present": "Gargron",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "gravatar",
+      "url": "https://gravatar.com/{username_lower}",
+      "probe_url": "https://en.gravatar.com/{username_lower}.json",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9_.-]{2,64}",
+      "profile_fields": {
+        "display_name": "entry.0.displayName",
+        "bio": "entry.0.aboutMe",
+        "location": "entry.0.currentLocation"
+      },
+      "known_present": "beau",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "codewars",
+      "url": "https://www.codewars.com/users/{username}",
+      "probe_url": "https://www.codewars.com/api/v1/users/{username}",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9_-]{1,30}",
+      "profile_fields": {
+        "display_name": "name",
+        "stats": {
+          "honor": "honor"
+        }
+      },
+      "known_present": "jhoffner",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "huggingface",
+      "url": "https://huggingface.co/{username}",
+      "probe_url": "https://huggingface.co/api/users/{username}/overview",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9][A-Za-z0-9_.-]{0,41}",
+      "profile_fields": {
+        "display_name": "fullname",
+        "bio": "details",
+        "created_at": "createdAt",
+        "stats": {
+          "models": "numModels",
+          "datasets": "numDatasets",
+          "spaces": "numSpaces",
+          "followers": "numFollowers"
+        }
+      },
+      "known_present": "julien-c",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "launchpad",
+      "url": "https://launchpad.net/~{username_lower}",
+      "probe_url": "https://api.launchpad.net/1.0/~{username_lower}",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9][A-Za-z0-9.-]{2,31}",
+      "profile_fields": {
+        "display_name": "display_name",
+        "bio": "description",
+        "created_at": "date_created",
+        "stats": {
+          "karma": "karma"
+        }
+      },
+      "known_present": "sabdfl",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "wikipedia",
+      "url": "https://en.wikipedia.org/wiki/User:{username}",
+      "probe_url": "https://en.wikipedia.org/w/api.php?action=query&list=users&ususers={username}&usprop=registration|editcount&format=json",
+      "source": "api",
+      "username_pattern": "[A-Za-z0-9_.-]{1,64}",
+      "found_text": "\"userid\"",
+      "not_found_text": "\"missing\"",
+      "profile_fields": {
+        "created_at": "query.users.0.registration",
+        "stats": {
+          "edits": "query.users.0.editcount"
+        }
+      },
+      "known_present": "Jimbo_Wales",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "hackerone",
+      "url": "https://hackerone.com/{username}",
+      "probe_url": "https://hackerone.com/{username}?type=user",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9_-]{3,40}",
+      "known_present": "jobert",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "kaggle",
+      "url": "https://www.kaggle.com/{username}",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9_-]{3,40}",
+      "known_present": "jhoward",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "pastebin",
+      "url": "https://pastebin.com/u/{username}",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9_-]{3,20}",
+      "known_present": "admin",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "vimeo",
+      "url": "https://vimeo.com/{username}",
+      "source": "html",
+      "username_pattern": "[A-Za-z][A-Za-z0-9_]{2,31}",
+      "known_present": "staff",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "soundcloud",
+      "url": "https://soundcloud.com/{username_lower}",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9_-]{3,25}",
+      "known_present": "skrillex",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "dribbble",
+      "url": "https://dribbble.com/{username}",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9_-]{2,30}",
+      "known_present": "simplebits",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "linktree",
+      "url": "https://linktr.ee/{username}",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9_.]{2,30}",
+      "known_present": "selenagomez",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "itchio",
+      "url": "https://{username_lower}.itch.io/",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9][A-Za-z0-9-]{1,29}",
+      "known_present": "leafo",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "sourcehut",
+      "url": "https://sr.ht/~{username_lower}/",
+      "source": "html",
+      "username_pattern": "[A-Za-z_][A-Za-z0-9_]{1,29}",
+      "known_present": "sircmpwn",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "patreon",
+      "url": "https://www.patreon.com/{username}",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9_]{2,64}",
+      "known_present": "patreon",
+      "known_absent": "zq7xk2vq9wplm3"
+    },
+    {
+      "name": "flickr",
+      "url": "https://www.flickr.com/people/{username}/",
+      "source": "html",
+      "username_pattern": "[A-Za-z0-9_-]{2,32}",
+      "known_present": "flickr",
+      "known_absent": "zq7xk2vq9wplm3"
+    }
+  ]
+}

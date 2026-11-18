@@ -4,10 +4,11 @@ from dataclasses import asdict, dataclass
 import re
 from typing import Any, Dict, List, Optional
 
+import dns.exception
 import dns.resolver
 
 from minimal_recon.services.dns import normalize_domain
-
+from minimal_recon.services.http import resolve_timeout
 
 EMAIL_PATTERN = re.compile(r"^([^@\s]+)@([^@\s]+)$")
 ROLE_PREFIXES = {"admin", "contact", "hello", "info", "noreply", "sales", "support", "security"}
@@ -48,7 +49,7 @@ def analyze_email(
     resolver = resolver or dns.resolver.Resolver()
     mx_records: List[str] = []
     try:
-        answers = resolver.resolve(domain, "MX", lifetime=3)
+        answers = resolver.resolve(domain, "MX", lifetime=resolve_timeout(3))
     except (dns.exception.DNSException, OSError):
         pass
     else:

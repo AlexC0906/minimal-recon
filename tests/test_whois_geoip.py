@@ -14,7 +14,9 @@ class FakeWhoisClient:
                     {"eventAction": "registration", "eventDate": "2020-01-01T00:00:00Z"},
                     {"eventAction": "expiration", "eventDate": "2030-01-01T00:00:00Z"},
                 ],
-                "entities": [{"roles": ["registrar"], "vcardArray": ["vcard", [["fn", {}, "text", "Example Registrar"]]]}],
+                "entities": [
+                    {"roles": ["registrar"], "vcardArray": ["vcard", [["fn", {}, "text", "Example Registrar"]]]}
+                ],
                 "nameservers": [{"ldhName": "NS1.EXAMPLE.TEST"}],
             },
             request=httpx.Request("GET", url),

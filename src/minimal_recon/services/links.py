@@ -7,6 +7,9 @@ from urllib.parse import urldefrag, urljoin, urlparse
 
 import httpx
 
+from minimal_recon.services.http import with_client
+from minimal_recon.services.web import validate_url
+
 
 @dataclass(frozen=True)
 class LinkResult:
@@ -36,7 +39,7 @@ def extract_links(
     max_links: int = 500,
 ) -> LinkResult:
     """Extract normalized HTTP(S) links from one public HTML page."""
-    normalized_url = _validate_url(url)
+    normalized_url = validate_url(url)
     if max_links < 1 or max_links > 5000:
         raise ValueError("max_links must be between 1 and 5000")
 
@@ -49,8 +52,12 @@ def extract_links(
         origin = urlparse(final_url).netloc.lower()
         links = []
         for href in parser.hrefs:
-            candidate, _ = urldefrag(urljoin(final_url, href.strip()))
-            parsed = urlparse(candidate)
+            try:
+                candidate, _ = urldefrag(urljoin(final_url, href.strip()))
+                parsed = urlparse(candidate)
+            except ValueError:
+                # One malformed href (e.g. a broken IPv6 literal) must not fail the page.
+                continue
             if parsed.scheme in ("http", "https") and parsed.netloc and candidate not in links:
                 links.append(candidate)
             if len(links) >= max_links:
@@ -59,18 +66,7 @@ def extract_links(
         external = sorted(link for link in links if urlparse(link).netloc.lower() != origin)
         return LinkResult(normalized_url, final_url, internal, external, len(links))
 
-    if client is not None:
-        return request(client)
-    with httpx.Client(follow_redirects=True, timeout=10) as active_client:
-        return request(active_client)
-
-
-def _validate_url(url: str) -> str:
-    normalized = url.strip()
-    parsed = urlparse(normalized)
-    if parsed.scheme not in ("http", "https") or not parsed.netloc:
-        raise ValueError("URL must include an http:// or https:// scheme")
-    return normalized
+    return with_client(request, client, timeout=10)
 
 
 def links_to_dict(result: LinkResult) -> Dict[str, Any]:
