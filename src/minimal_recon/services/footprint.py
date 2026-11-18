@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 import re
 import time
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union
 from urllib.parse import quote_plus, urlparse
 
 import httpx
@@ -98,6 +98,8 @@ class SiteRule:
     unknown_url: Optional[str] = None
     known_present: Optional[str] = None
     known_absent: Optional[str] = None
+    # Display name such as "GitHub" or "Hacker News"; the key in `name` stays machine-friendly.
+    label: str = ""
     # Maps PROFILE_FIELDS names to dotted JSON paths in an API response.
     # ``declared_accounts`` and ``stats`` map a label to a path instead.
     profile_fields: Optional[Dict[str, Any]] = field(default=None, compare=False)
@@ -208,18 +210,29 @@ class _PageSummaryParser(HTMLParser):
         self.page_title = ""
         self.meta_description = ""
         self.in_title = False
+        self.title_done = False
+        self.svg_depth = 0
 
     def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
         attributes = dict(attrs)
-        if tag.lower() == "title":
+        tag = tag.lower()
+        if tag == "svg":
+            self.svg_depth += 1
+        # Only the document's first <title> counts; icons carry their own
+        # <title> elements inside <svg>, which would otherwise be appended.
+        if tag == "title" and not self.title_done and not self.svg_depth:
             self.in_title = True
         # Valueless attributes (<meta name>) are reported by the parser as None.
-        if tag.lower() == "meta" and (attributes.get("name") or "").lower() == "description":
+        if tag == "meta" and (attributes.get("name") or "").lower() == "description" and not self.meta_description:
             self.meta_description = _compact_text(attributes.get("content") or "")[:300]
 
     def handle_endtag(self, tag: str) -> None:
-        if tag.lower() == "title":
+        tag = tag.lower()
+        if tag == "svg" and self.svg_depth:
+            self.svg_depth -= 1
+        if tag == "title" and self.in_title:
             self.in_title = False
+            self.title_done = True
             self.page_title = _compact_text(" ".join(self.title_parts))[:200]
 
     def handle_data(self, data: str) -> None:
@@ -257,6 +270,7 @@ def check_username(
     delay_seconds: float = 0.0,
     details: bool = False,
     audit_token: Optional[str] = None,
+    on_result: Optional[Callable[[FootprintResult], None]] = None,
 ) -> List[FootprintResult]:
     """Check public profiles for one username without bypassing access controls.
 
@@ -268,6 +282,9 @@ def check_username(
     ``audit_token`` turns on self-audit mode for someone checking their own
     footprint: profiles that show the token are marked ``owner_verified``, and
     only those profiles' self-declared accounts are checked one hop further.
+
+    ``on_result`` is called with each result as soon as it is ready, in
+    completion order and possibly from several threads at once.
     """
     username = validate_username(username)
     if audit_token is not None:
@@ -280,16 +297,23 @@ def check_username(
         by_host.setdefault(rule.host, []).append(index)
     results: List[Optional[FootprintResult]] = [None] * len(rules)
 
+    def publish(result: FootprintResult) -> FootprintResult:
+        if on_result is not None:
+            on_result(result)
+        return result
+
     def run_host(active_client: httpx.Client, indexes: List[int]) -> None:
         requested = False
         for index in indexes:
             rule = rules[index]
             if not rule.accepts(username):
-                results[index] = _not_applicable(rule, username)
+                results[index] = publish(_not_applicable(rule, username))
                 continue
             if requested and delay_seconds > 0:
                 time.sleep(delay_seconds)
-            results[index] = check_site(rule, username, active_client, details=details, audit_token=audit_token)
+            results[index] = publish(
+                check_site(rule, username, active_client, details=details, audit_token=audit_token)
+            )
             requested = True
 
     followed: List[FootprintResult] = []
@@ -310,7 +334,7 @@ def check_username(
                     continue
                 seen.add((target.name, handle.lower()))
                 found = check_site(target, handle, active_client, details=True, audit_token=audit_token)
-                followed.append(replace(found, discovered_from=f"{result.site}:{label}"))
+                followed.append(publish(replace(found, discovered_from=f"{result.site}:{label}")))
 
     def collect(active_client: httpx.Client) -> None:
         workers = max(1, min(MAX_WORKERS, len(by_host)))
@@ -576,6 +600,7 @@ def mastodon_rule(server: str, base: Optional[SiteRule] = None) -> SiteRule:
     return replace(
         base,
         name=f"mastodon@{server}",
+        label=f"Mastodon ({server})",
         url=base.url.replace("mastodon.social", server),
         probe_url=base.probe_url.replace("mastodon.social", server),
         known_present=None,

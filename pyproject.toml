@@ -1,13 +1,29 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "minimal-recon"
-version = "0.1.0"
-description = "A modular, read-only OSINT reconnaissance CLI."
+dynamic = ["version"]
+description = "Passive, read-only OSINT toolkit: domains, IPs, web, email, usernames, with a local web interface."
 readme = "README.md"
 requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "AlexC0906" }]
+keywords = ["osint", "reconnaissance", "security", "dns", "footprint", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Intended Audience :: Information Technology",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+]
 dependencies = [
     "certifi",
     "cryptography>=42",
@@ -25,8 +41,16 @@ dev = [
     "ruff>=0.6",
 ]
 
+[project.urls]
+Homepage = "https://github.com/AlexC0906/minimal-recon"
+Changelog = "https://github.com/AlexC0906/minimal-recon/blob/main/CHANGELOG.md"
+Issues = "https://github.com/AlexC0906/minimal-recon/issues"
+
 [project.scripts]
 recon = "minimal_recon.cli:app"
+
+[tool.setuptools.dynamic]
+version = { attr = "minimal_recon.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]

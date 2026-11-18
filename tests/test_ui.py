@@ -1,3 +1,4 @@
+import json
 import threading
 
 import httpx
@@ -59,14 +60,14 @@ def test_sites_lists_registry(running):
 
     data = post(client, "/api/sites").json()
 
-    assert {"name": "instagram", "source": "html"} in data["sites"]
+    assert {"name": "instagram", "label": "Instagram", "source": "html"} in data["sites"]
     assert data["version"]
 
 
 def test_footprint_endpoint_runs_each_username(running, monkeypatch):
     calls = []
 
-    def fake_check(username, sites, delay_seconds, details, audit_token):
+    def fake_check(username, sites, delay_seconds, details, audit_token, on_result=None):
         calls.append((username, sorted(sites), details))
         return [FootprintResult("github", f"https://github.com/{username}", True, 200, "http_status_200", "found")]
 
@@ -298,3 +299,127 @@ def test_small_body_limit_applies_to_other_routes(running):
 
     assert response.status_code == 400
     assert "too large" in response.json()["error"]
+
+
+@pytest.fixture
+def history_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("MINIMAL_RECON_HOME", str(tmp_path))
+    return tmp_path
+
+
+def stream_events(client, payload):
+    response = post(client, "/api/footprint/stream", payload)
+    return response, [json.loads(line) for line in response.text.splitlines() if line.strip()]
+
+
+def fake_stream_check(username, sites, delay_seconds, details, audit_token, on_result=None):
+    results = [
+        FootprintResult("x", f"https://x.test/{username}", False, 404, "http_status_404", "not_found"),
+        FootprintResult("github", f"https://github.com/{username}", True, 200, "http_status_200", "found"),
+    ]
+    for result in reversed(results):  # completion order differs from registry order
+        on_result(result)
+    return results
+
+
+def test_stream_sends_each_result_then_ordered_results(running, monkeypatch, history_home):
+    monkeypatch.setattr(footprint, "check_username", fake_stream_check)
+    _, client = running
+
+    response, events = stream_events(client, {"usernames": "alice", "save": True})
+
+    assert response.headers["content-type"].startswith("application/x-ndjson")
+    assert [event["type"] for event in events] == ["start", "result", "result", "done", "end"]
+    assert [event["result"]["site"] for event in events if event["type"] == "result"] == ["github", "x"]
+    done = events[3]
+    assert [result["site"] for result in done["results"]] == ["x", "github"]
+    assert done["history"]["previous_id"] is None
+
+
+def test_stream_reports_changes_since_previous_saved_run(running, monkeypatch, history_home):
+    monkeypatch.setattr(footprint, "check_username", fake_stream_check)
+    _, client = running
+
+    stream_events(client, {"usernames": "alice", "save": True})
+    _, events = stream_events(client, {"usernames": "alice", "save": True})
+
+    info = [event for event in events if event["type"] == "done"][0]["history"]
+    assert info["previous_id"] and info["changes"] == 0
+
+
+def test_stream_without_save_writes_nothing(running, monkeypatch, history_home):
+    monkeypatch.setattr(footprint, "check_username", fake_stream_check)
+    _, client = running
+
+    _, events = stream_events(client, {"usernames": "alice"})
+
+    assert "history" not in [event for event in events if event["type"] == "done"][0]
+    assert not (history_home / "history").exists()
+
+
+def test_stream_rejects_bad_input_before_streaming(running):
+    _, client = running
+
+    response = post(client, "/api/footprint/stream", {"usernames": "bad/name"})
+
+    assert response.status_code == 400
+    assert "username must be" in response.json()["error"]
+
+
+def test_stream_turns_failures_into_error_events(running, monkeypatch):
+    def failing(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(footprint, "check_username", failing)
+    _, client = running
+
+    _, events = stream_events(client, {"usernames": "alice"})
+
+    assert events[-2] == {"type": "error", "username": "alice", "error": "boom"}
+    assert events[-1] == {"type": "end"}
+
+
+def test_history_endpoints(running, history_home):
+    from minimal_recon.services import history
+
+    old = history.save("report", "example.test", {"target": "example.test", "generated_at": "1", "dns": {"A": ["1"]}})
+    new = history.save("report", "example.test", {"target": "example.test", "generated_at": "2", "dns": {"A": ["2"]}})
+    _, client = running
+
+    listing = post(client, "/api/history/list", {"kind": "report"}).json()
+    entry = post(client, "/api/history/get", {"id": new.id}).json()
+    versus_previous = post(client, "/api/history/compare", {"new_id": new.id}).json()
+    no_previous = post(client, "/api/history/compare", {"new_id": old.id})
+    deleted = post(client, "/api/history/delete", {"id": old.id}).json()
+
+    assert [item["id"] for item in listing["entries"]] == [new.id, old.id]
+    assert listing["folder"].startswith(str(history_home))
+    assert "<!doctype html>" in entry["html"]
+    assert {"path": "dns.A", "change": "added", "old": None, "new": "2"} in versus_previous["changes"]
+    assert no_previous.status_code == 400
+    assert deleted == {"deleted": True}
+    assert post(client, "/api/history/get", {"id": "../../etc/passwd"}).status_code == 400
+
+
+def test_report_endpoint_saves_when_asked(running, monkeypatch, history_home):
+    from minimal_recon.services import report
+
+    monkeypatch.setattr(
+        report, "build_report", lambda domain, username, footprint_details: {"target": domain, "generated_at": "now"}
+    )
+    _, client = running
+
+    first = post(client, "/api/report", {"domain": "example.test", "save": True}).json()
+    second = post(client, "/api/report", {"domain": "example.test", "save": True}).json()
+
+    assert first["history"]["previous_id"] is None
+    assert second["history"]["previous_id"] == first["history"]["id"]
+
+
+def test_port_cannot_be_shared_with_a_second_server():
+    first = ui.UiServer(0, token="a")
+    try:
+        with pytest.raises(OSError):
+            ui.UiServer(first.server_port, token="b")
+    finally:
+        first.server_close()

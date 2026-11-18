@@ -18,6 +18,7 @@
     <nav class="tabs" role="tablist" id="tabs">
       <button class="tab active" role="tab" aria-selected="true" data-tab="username">Username</button>
       <!-- tool tabs are added by app.js -->
+      <button class="tab" role="tab" aria-selected="false" data-tab="history">History</button>
       <button class="tab" role="tab" aria-selected="false" data-tab="rules">Rules</button>
     </nav>
   </header>
@@ -36,6 +37,7 @@
       <div class="options">
         <label class="check"><input type="checkbox" id="opt-details" checked> Profile details</label>
         <label class="check"><input type="checkbox" id="opt-found-only" checked> Found only</label>
+        <label class="check"><input type="checkbox" id="opt-save" checked> Save to history</label>
         <details class="sites-picker">
           <summary>Sites: <span id="sites-count">all</span></summary>
           <div class="sites-actions">
@@ -66,7 +68,30 @@
       </p>
     </section>
 
-    <!-- tool panels are added by app.js before the rules panel -->
+    <!-- tool panels are added by app.js before the history panel -->
+
+    <section class="panel hidden" id="tab-history">
+      <div class="search">
+        <label class="field">
+          <span>Kind</span>
+          <select id="history-kind">
+            <option value="">All</option>
+            <option value="footprint">Username footprints</option>
+            <option value="report">Domain reports</option>
+          </select>
+        </label>
+        <label class="field grow">
+          <span>Target contains</span>
+          <input id="history-target" placeholder="username or domain" autocomplete="off" spellcheck="false">
+        </label>
+        <button type="button" id="history-refresh">Refresh</button>
+        <button type="button" id="history-compare" disabled>Compare selected</button>
+      </div>
+      <p class="muted small" id="history-folder"></p>
+      <div class="status" id="history-status" role="status" aria-live="polite"></div>
+      <div id="history-list"></div>
+      <div class="output" id="history-output"></div>
+    </section>
 
     <section class="panel hidden" id="tab-rules">
       <div class="search">

@@ -8,3 +8,5 @@ htmlcov/
 build/
 dist/
 *.whl
+.mypy_cache/
+.ruff_cache/

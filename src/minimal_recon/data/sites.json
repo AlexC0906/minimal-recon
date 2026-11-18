@@ -3,6 +3,7 @@
   "sites": [
     {
       "name": "github",
+      "label": "GitHub",
       "url": "https://github.com/{username}",
       "probe_url": "https://api.github.com/users/{username}",
       "source": "api",
@@ -27,6 +28,7 @@
     },
     {
       "name": "gitlab",
+      "label": "GitLab",
       "url": "https://gitlab.com/{username}",
       "probe_url": "https://gitlab.com/api/v4/users?username={username}",
       "source": "api",
@@ -41,6 +43,7 @@
     },
     {
       "name": "codeberg",
+      "label": "Codeberg",
       "url": "https://codeberg.org/{username}",
       "probe_url": "https://codeberg.org/api/v1/users/{username}",
       "source": "api",
@@ -60,6 +63,7 @@
     },
     {
       "name": "devto",
+      "label": "DEV",
       "url": "https://dev.to/{username}",
       "probe_url": "https://dev.to/api/users/by_username?url={username}",
       "source": "api",
@@ -80,6 +84,7 @@
     },
     {
       "name": "hackernews",
+      "label": "Hacker News",
       "url": "https://news.ycombinator.com/user?id={username}",
       "probe_url": "https://hacker-news.firebaseio.com/v0/user/{username}.json",
       "source": "api",
@@ -97,6 +102,7 @@
     },
     {
       "name": "bluesky",
+      "label": "Bluesky",
       "url": "https://bsky.app/profile/{username_lower}.bsky.social",
       "probe_url": "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={username_lower}.bsky.social",
       "source": "api",
@@ -120,6 +126,7 @@
     },
     {
       "name": "keybase",
+      "label": "Keybase",
       "url": "https://keybase.io/{username}",
       "probe_url": "https://keybase.io/_/api/1.0/user/lookup.json?usernames={username}",
       "source": "api",
@@ -137,6 +144,7 @@
     },
     {
       "name": "dockerhub",
+      "label": "Docker Hub",
       "url": "https://hub.docker.com/u/{username_lower}",
       "probe_url": "https://hub.docker.com/v2/users/{username_lower}/",
       "source": "api",
@@ -152,6 +160,7 @@
     },
     {
       "name": "lichess",
+      "label": "Lichess",
       "url": "https://lichess.org/@/{username}",
       "probe_url": "https://lichess.org/api/user/{username}",
       "source": "api",
@@ -172,6 +181,7 @@
     },
     {
       "name": "chesscom",
+      "label": "Chess.com",
       "url": "https://www.chess.com/member/{username_lower}",
       "probe_url": "https://api.chess.com/pub/player/{username_lower}",
       "source": "api",
@@ -189,6 +199,7 @@
     },
     {
       "name": "medium",
+      "label": "Medium",
       "url": "https://medium.com/@{username}",
       "probe_url": "https://medium.com/feed/@{username}",
       "source": "api",
@@ -199,6 +210,7 @@
     },
     {
       "name": "x",
+      "label": "X",
       "url": "https://x.com/{username}",
       "source": "html",
       "username_pattern": "[A-Za-z0-9_]{1,15}",
@@ -207,6 +219,7 @@
     },
     {
       "name": "instagram",
+      "label": "Instagram",
       "url": "https://www.instagram.com/{username}/",
       "source": "html",
       "username_pattern": "[A-Za-z0-9._]{1,30}",
@@ -219,6 +232,7 @@
     },
     {
       "name": "tiktok",
+      "label": "TikTok",
       "url": "https://www.tiktok.com/@{username}",
       "source": "html",
       "username_pattern": "[A-Za-z0-9._]{2,24}",
@@ -229,6 +243,7 @@
     },
     {
       "name": "pinterest",
+      "label": "Pinterest",
       "url": "https://www.pinterest.com/{username}/",
       "source": "html",
       "username_pattern": "[A-Za-z0-9_]{3,30}",
@@ -239,6 +254,7 @@
     },
     {
       "name": "twitch",
+      "label": "Twitch",
       "url": "https://www.twitch.tv/{username}",
       "source": "html",
       "username_pattern": "[A-Za-z0-9][A-Za-z0-9_]{3,24}",
@@ -249,6 +265,7 @@
     },
     {
       "name": "steam",
+      "label": "Steam",
       "url": "https://steamcommunity.com/id/{username}",
       "source": "html",
       "username_pattern": "[A-Za-z0-9_-]{2,32}",
@@ -259,6 +276,7 @@
     },
     {
       "name": "telegram",
+      "label": "Telegram",
       "url": "https://t.me/{username}",
       "source": "html",
       "username_pattern": "[A-Za-z][A-Za-z0-9_]{3,31}",
@@ -269,6 +287,7 @@
     },
     {
       "name": "youtube",
+      "label": "YouTube",
       "url": "https://www.youtube.com/@{username}",
       "source": "html",
       "username_pattern": "[A-Za-z0-9._-]{3,30}",
@@ -278,6 +297,7 @@
     },
     {
       "name": "mastodon",
+      "label": "Mastodon",
       "url": "https://mastodon.social/@{username}",
       "probe_url": "https://mastodon.social/api/v1/accounts/lookup?acct={username}",
       "source": "api",
@@ -297,6 +317,7 @@
     },
     {
       "name": "gravatar",
+      "label": "Gravatar",
       "url": "https://gravatar.com/{username_lower}",
       "probe_url": "https://en.gravatar.com/{username_lower}.json",
       "source": "api",
@@ -311,6 +332,7 @@
     },
     {
       "name": "codewars",
+      "label": "Codewars",
       "url": "https://www.codewars.com/users/{username}",
       "probe_url": "https://www.codewars.com/api/v1/users/{username}",
       "source": "api",
@@ -326,6 +348,7 @@
     },
     {
       "name": "huggingface",
+      "label": "Hugging Face",
       "url": "https://huggingface.co/{username}",
       "probe_url": "https://huggingface.co/api/users/{username}/overview",
       "source": "api",
@@ -346,6 +369,7 @@
     },
     {
       "name": "launchpad",
+      "label": "Launchpad",
       "url": "https://launchpad.net/~{username_lower}",
       "probe_url": "https://api.launchpad.net/1.0/~{username_lower}",
       "source": "api",
@@ -363,6 +387,7 @@
     },
     {
       "name": "wikipedia",
+      "label": "Wikipedia",
       "url": "https://en.wikipedia.org/wiki/User:{username}",
       "probe_url": "https://en.wikipedia.org/w/api.php?action=query&list=users&ususers={username}&usprop=registration|editcount&format=json",
       "source": "api",
@@ -380,6 +405,7 @@
     },
     {
       "name": "hackerone",
+      "label": "HackerOne",
       "url": "https://hackerone.com/{username}",
       "probe_url": "https://hackerone.com/{username}?type=user",
       "source": "html",
@@ -389,6 +415,7 @@
     },
     {
       "name": "kaggle",
+      "label": "Kaggle",
       "url": "https://www.kaggle.com/{username}",
       "source": "html",
       "username_pattern": "[A-Za-z0-9_-]{3,40}",
@@ -397,6 +424,7 @@
     },
     {
       "name": "pastebin",
+      "label": "Pastebin",
       "url": "https://pastebin.com/u/{username}",
       "source": "html",
       "username_pattern": "[A-Za-z0-9_-]{3,20}",
@@ -405,6 +433,7 @@
     },
     {
       "name": "vimeo",
+      "label": "Vimeo",
       "url": "https://vimeo.com/{username}",
       "source": "html",
       "username_pattern": "[A-Za-z][A-Za-z0-9_]{2,31}",
@@ -413,6 +442,7 @@
     },
     {
       "name": "soundcloud",
+      "label": "SoundCloud",
       "url": "https://soundcloud.com/{username_lower}",
       "source": "html",
       "username_pattern": "[A-Za-z0-9_-]{3,25}",
@@ -421,6 +451,7 @@
     },
     {
       "name": "dribbble",
+      "label": "Dribbble",
       "url": "https://dribbble.com/{username}",
       "source": "html",
       "username_pattern": "[A-Za-z0-9_-]{2,30}",
@@ -429,6 +460,7 @@
     },
     {
       "name": "linktree",
+      "label": "Linktree",
       "url": "https://linktr.ee/{username}",
       "source": "html",
       "username_pattern": "[A-Za-z0-9_.]{2,30}",
@@ -437,6 +469,7 @@
     },
     {
       "name": "itchio",
+      "label": "itch.io",
       "url": "https://{username_lower}.itch.io/",
       "source": "html",
       "username_pattern": "[A-Za-z0-9][A-Za-z0-9-]{1,29}",
@@ -445,6 +478,7 @@
     },
     {
       "name": "sourcehut",
+      "label": "SourceHut",
       "url": "https://sr.ht/~{username_lower}/",
       "source": "html",
       "username_pattern": "[A-Za-z_][A-Za-z0-9_]{1,29}",
@@ -453,6 +487,7 @@
     },
     {
       "name": "patreon",
+      "label": "Patreon",
       "url": "https://www.patreon.com/{username}",
       "source": "html",
       "username_pattern": "[A-Za-z0-9_]{2,64}",
@@ -461,6 +496,7 @@
     },
     {
       "name": "flickr",
+      "label": "Flickr",
       "url": "https://www.flickr.com/people/{username}/",
       "source": "html",
       "username_pattern": "[A-Za-z0-9_-]{2,32}",

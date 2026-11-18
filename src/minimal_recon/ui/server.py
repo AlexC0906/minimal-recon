@@ -8,15 +8,17 @@ same browser from driving the tool (cross-site requests, DNS rebinding).
 
 import base64
 import binascii
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 import json
+import os
 from pathlib import Path
 import re
 import secrets
 import tempfile
+import threading
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 import webbrowser
@@ -32,6 +34,7 @@ from minimal_recon.services import dns as dns_service
 from minimal_recon.services import email as email_service
 from minimal_recon.services import footprint as footprint_service
 from minimal_recon.services import geoip as geoip_service
+from minimal_recon.services import history as history_service
 from minimal_recon.services import links as links_service
 from minimal_recon.services import lookup as lookup_service
 from minimal_recon.services import metadata as metadata_service
@@ -83,18 +86,41 @@ def _string_list(value: Any, field: str, limit: int) -> List[str]:
 def api_sites(payload: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "version": __version__,
-        "sites": [{"name": rule.name, "source": rule.source} for rule in footprint_service.SITES.values()],
+        "sites": [
+            {"name": rule.name, "label": rule.label or rule.name, "source": rule.source}
+            for rule in footprint_service.SITES.values()
+        ],
     }
 
 
-def api_footprint(payload: Dict[str, Any]) -> Dict[str, Any]:
+@dataclass(frozen=True)
+class FootprintRequest:
+    usernames: List[str]
+    registry: Dict[str, Any]
+    details: bool
+    audit_token: Optional[str]
+    save: bool
+
+    def run(self, username: str, on_result: Optional[Callable[[Any], None]] = None) -> List[Any]:
+        return footprint_service.check_username(
+            username,
+            sites=self.registry,
+            delay_seconds=0.2,
+            details=self.details,
+            audit_token=self.audit_token,
+            on_result=on_result,
+        )
+
+
+def parse_footprint_request(payload: Dict[str, Any]) -> FootprintRequest:
+    """Validate a footprint request completely before any site is contacted."""
     usernames = _string_list(payload.get("usernames"), "usernames", MAX_USERNAMES)
     if not usernames:
         raise ValueError("enter at least one username")
     for username in usernames:
         footprint_service.validate_username(username)
 
-    registry: Dict[str, footprint_service.SiteRule] = dict(footprint_service.SITES)
+    registry: Dict[str, Any] = dict(footprint_service.SITES)
     selected = _string_list(payload.get("sites"), "sites", len(registry))
     if selected:
         unknown = sorted(set(selected) - set(registry))
@@ -105,17 +131,39 @@ def api_footprint(payload: Dict[str, Any]) -> Dict[str, Any]:
         rule = footprint_service.mastodon_rule(server)
         registry[rule.name] = rule
 
-    audit_token = payload.get("audit_token") or None
+    audit_token = str(payload.get("audit_token") or "").strip() or None
+    if audit_token:
+        footprint_service._validate_token(audit_token)
+    return FootprintRequest(usernames, registry, bool(payload.get("details")), audit_token, bool(payload.get("save")))
+
+
+def save_footprint(username: str, results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Store one footprint run and describe how it differs from the previous one."""
+    entry = history_service.save(
+        "footprint", username, {"username": username, "results": results},
+        history_service.summarize_footprint(results),
+    )
+    return _history_info(entry)
+
+
+def _history_info(entry: Any) -> Dict[str, Any]:
+    info: Dict[str, Any] = {"id": entry.id, "previous_id": None, "previous_at": None, "changes": 0}
+    earlier = history_service.previous(entry)
+    if earlier is not None:
+        comparison = history_service.compare(earlier.id, entry.id)
+        info.update(previous_id=earlier.id, previous_at=earlier.created_at, changes=len(comparison["changes"]))
+    return info
+
+
+def api_footprint(payload: Dict[str, Any]) -> Dict[str, Any]:
+    request = parse_footprint_request(payload)
     runs = []
-    for username in usernames:
-        results = footprint_service.check_username(
-            username,
-            sites=registry,
-            delay_seconds=0.2,
-            details=bool(payload.get("details")),
-            audit_token=audit_token,
-        )
-        runs.append({"username": username, "results": [asdict(result) for result in results]})
+    for username in request.usernames:
+        results = [asdict(result) for result in request.run(username)]
+        run: Dict[str, Any] = {"username": username, "results": results}
+        if request.save:
+            run["history"] = save_footprint(username, results)
+        runs.append(run)
     return {"runs": runs}
 
 
@@ -135,7 +183,45 @@ def api_report(payload: Dict[str, Any]) -> Dict[str, Any]:
     if username:
         footprint_service.validate_username(username)
     report = report_service.build_report(domain, username, footprint_details=bool(payload.get("details")))
-    return {"report": report, "html": report_service.render_html(report)}
+    result: Dict[str, Any] = {"report": report, "html": report_service.render_html(report)}
+    if payload.get("save"):
+        entry = history_service.save(
+            "report", str(report["target"]), report, history_service.summarize_report(report)
+        )
+        result["history"] = _history_info(entry)
+    return result
+
+
+def api_history_list(payload: Dict[str, Any]) -> Dict[str, Any]:
+    kind = str(payload.get("kind") or "") or None
+    if kind and kind not in history_service.KINDS:
+        raise ValueError("unknown history kind")
+    entries = history_service.list_entries(kind, str(payload.get("target") or "") or None)
+    return {"folder": str(history_service.history_dir()), "entries": [asdict(entry) for entry in entries]}
+
+
+def api_history_get(payload: Dict[str, Any]) -> Dict[str, Any]:
+    stored = history_service.load(str(payload.get("id", "")))
+    entry, data = stored["entry"], stored["data"]
+    result: Dict[str, Any] = {"entry": asdict(entry), "data": data}
+    if entry.kind == "report" and isinstance(data, dict):
+        result["html"] = report_service.render_html(data)
+    return result
+
+
+def api_history_compare(payload: Dict[str, Any]) -> Dict[str, Any]:
+    new_id = str(payload.get("new_id", ""))
+    old_id = str(payload.get("old_id") or "")
+    if not old_id:
+        earlier = history_service.previous(history_service.load(new_id)["entry"])
+        if earlier is None:
+            raise ValueError("there is no earlier run of this target to compare with")
+        old_id = earlier.id
+    return history_service.compare(old_id, new_id)
+
+
+def api_history_delete(payload: Dict[str, Any]) -> Dict[str, Any]:
+    return {"deleted": history_service.delete(str(payload.get("id", "")))}
 
 
 def _text(args: Dict[str, Any], name: str, label: Optional[str] = None) -> str:
@@ -253,7 +339,13 @@ API_ROUTES: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]] = {
     "/api/self-test": api_self_test,
     "/api/report": api_report,
     "/api/tool": api_tool,
+    "/api/history/list": api_history_list,
+    "/api/history/get": api_history_get,
+    "/api/history/compare": api_history_compare,
+    "/api/history/delete": api_history_delete,
 }
+
+STREAM_ROUTE = "/api/footprint/stream"
 
 # Uploaded files (metadata) and saved reports (diff) need larger bodies.
 LARGE_BODY_ROUTES = {"/api/tool": 30_000_000}
@@ -261,6 +353,9 @@ LARGE_BODY_ROUTES = {"/api/tool": 30_000_000}
 
 class UiServer(ThreadingHTTPServer):
     daemon_threads = True
+    # On Windows SO_REUSEADDR lets a second process bind the same port and
+    # receive the page's requests (and its API token), so it stays off there.
+    allow_reuse_address = os.name != "nt"
 
     def __init__(self, port: int = 0, token: Optional[str] = None) -> None:
         self.token = token or secrets.token_urlsafe(24)
@@ -298,6 +393,8 @@ class UiRequestHandler(BaseHTTPRequestHandler):
             self._discard_body()
             return self._send_json(HTTPStatus.FORBIDDEN, {"error": "missing or wrong API token; reload the page"})
         path = urlsplit(self.path).path
+        if path == STREAM_ROUTE:
+            return self._stream_footprint()
         route = API_ROUTES.get(path)
         if route is None:
             self._discard_body()
@@ -318,6 +415,56 @@ class UiRequestHandler(BaseHTTPRequestHandler):
         except Exception as error:  # keep the server alive and tell the page what failed
             return self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": f"unexpected error: {error}"})
         self._send_json(HTTPStatus.OK, result)
+
+    def _stream_footprint(self) -> None:
+        """Send footprint results as newline-delimited JSON while sites answer.
+
+        Events: ``start`` (username, total), ``result`` (one site), ``done``
+        (all results in registry order, plus history info), then ``end``.
+        Input errors are answered as ordinary JSON before streaming starts.
+        """
+        try:
+            request = parse_footprint_request(self._read_json())
+        except ValueError as error:
+            return self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
+
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+        self.end_headers()
+
+        lock = threading.Lock()
+        connected = [True]
+
+        def emit(event: Dict[str, Any]) -> None:
+            if not connected[0]:
+                return
+            line = (json.dumps(event, default=str) + "\n").encode("utf-8")
+            with lock:
+                try:
+                    self.wfile.write(line)
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                    connected[0] = False  # the page was closed; finish quietly
+
+        for username in request.usernames:
+            emit({"type": "start", "username": username, "total": len(request.registry)})
+
+            def on_result(result: Any, name: str = username) -> None:
+                emit({"type": "result", "username": name, "result": asdict(result)})
+
+            try:
+                results = request.run(username, on_result=on_result)
+                ordered = [asdict(result) for result in results]
+                done: Dict[str, Any] = {"type": "done", "username": username, "results": ordered}
+                if request.save:
+                    done["history"] = save_footprint(username, ordered)
+                emit(done)
+            except Exception as error:  # report it in the stream; headers are already sent
+                emit({"type": "error", "username": username, "error": str(error)})
+        emit({"type": "end"})
 
     def _host_allowed(self) -> bool:
         return self.headers.get("Host", "") in self.server.allowed_hosts

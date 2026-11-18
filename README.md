@@ -1,297 +1,230 @@
 # Minimal Recon
 
 [![CI](https://github.com/AlexC0906/minimal-recon/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexC0906/minimal-recon/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)
 
-Minimal Recon is a modular, read-only OSINT command-line utility written in Python.
-It is designed as a portfolio project with small services that can be extended without
-coupling the CLI to network or file-system logic.
+A passive, read-only OSINT toolkit for domains, IP addresses, web pages, email addresses
+and usernames, with a command line and a local web interface. It reads public data the
+way a browser or resolver would. It does not scan ports, brute-force paths, log in or
+bypass protections.
 
-## Features
+![Username search in the web interface](docs/images/ui-username.png)
 
-- `lookup`: basic IP/domain resolution and reverse DNS
-- `dns`: common DNS record enumeration (`A`, `AAAA`, `MX`, `NS`, `TXT`, `CNAME`)
-- `footprint`: username checks on 36 public sites with per-site rules, optional profile details and a self-test
-- `search-links`: manual-review search and Wayback links for a username
-- `ui`: local web interface for username searches, domain reports and the rule self-test
-- `email`: email format validation and public MX record analysis
-- `metadata`: local filesystem metadata plus image dimensions and readable EXIF fields
-- `web`: passive web security headers, WAF and technology fingerprint detection
-- `subdomains`: passive discovery from Certificate Transparency logs
-- `report`: consolidated JSON or HTML audit report
-- `diff`: offline comparison of two saved JSON reports
-- `whois`: public RDAP registration, registrar, dates and nameservers
-- `geoip`: approximate IP location and network ownership information
-- `archive`: public website history from the Wayback Machine
-- `verify`: explicit proof-of-control verification for supplied profile URLs
-- `reputation`: optional read-only VirusTotal IP/domain reputation lookup
-- `shodan`: optional read-only Shodan indexed host lookup
-- `tls`: read-only TLS version and certificate inspection, including invalid certificates
-- `links`: single-page surface link extraction without recursive crawling
-- `anti-spoofing`: public SPF, DMARC and selected DKIM policy analysis with weakness findings
-- `public-files`: checks intentionally public standard web documents
+## Highlights
 
-## Setup
+- **One report for a domain:** DNS, WHOIS, subdomains from Certificate Transparency, TLS
+  certificate, security headers, WAF and technology hints, SPF/DMARC/DKIM weaknesses,
+  public files and Wayback history, as JSON or a visual HTML report.
+- **Username footprint on 36 sites,** each with its own tested rule. Answers read from
+  public APIs are marked `confirmed`, answers inferred from profile pages `likely`, and
+  a self-test shows when a site change breaks a rule.
+- **Monitoring:** saved runs, "what changed since last time", and `recon watch` alerts for
+  new subdomains, DNS changes and expiring certificates.
+- **Local web interface** with live results, history and every command, served on
+  `127.0.0.1` only.
+- **Privacy by design:** only what people chose to publish on a profile is read; email
+  addresses, phone numbers, avatars and activity times are never collected, and opt-outs
+  are respected.
+- 225 automated tests, Ruff and mypy in CI on Python 3.9, 3.12 and 3.13.
+
+## Quick start
 
 ```powershell
+git clone https://github.com/AlexC0906/minimal-recon.git
+cd minimal-recon
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
+.\.venv\Scripts\Activate.ps1          # macOS/Linux: source .venv/bin/activate
+python -m pip install -e .
+recon ui                               # opens http://127.0.0.1:8765/
 ```
 
-## Local Testing
-
-Run the automated tests, linter and type checker:
+Or straight from the command line:
 
 ```powershell
-python -m pytest
-python -m ruff check .
-python -m mypy
+recon report example.com --html report.html
+recon footprint octocat --found-only --details
+recon --help
 ```
 
-Test commands without external requests:
+To install the `recon` command without a virtual environment, use
+`pipx install git+https://github.com/AlexC0906/minimal-recon.git`.
 
-```powershell
-python -m minimal_recon.cli --help
-python -m minimal_recon.cli lookup 192.0.2.10 --json
-python -m minimal_recon.cli metadata pyproject.toml --json
-```
+## Web interface
 
-For network-backed commands, use only authorized targets:
+`recon ui` opens the interface in your browser and keeps running until `Ctrl+C`.
 
-```powershell
-python -m minimal_recon.cli lookup example.com --json
-python -m minimal_recon.cli dns example.com --json
-python -m minimal_recon.cli footprint octocat --delay 0.5 --json
-python -m minimal_recon.cli web https://example.com --json
-python -m minimal_recon.cli subdomains example.com --json
-python -m minimal_recon.cli whois example.com --json
-python -m minimal_recon.cli geoip 1.1.1.1 --json
-python -m minimal_recon.cli archive example.com --json
-python -m minimal_recon.cli tls example.com --json
-python -m minimal_recon.cli links https://example.com --max-links 100 --json
-python -m minimal_recon.cli report example.com --username alex576_ --output audit.json --html audit.html
-```
-
-## Web Interface
-
-```powershell
-recon ui
-```
-
-This opens `http://127.0.0.1:8765/` in your browser. Every command has a place in it:
-
-| Tab | Tools |
+| Tab | What it does |
 | --- | --- |
-| Username | Footprint on all sites or a selection, profile details, "Found only" filter, search links, Mastodon servers, self-audit |
-| Domain | Full report (shown in the page, JSON and HTML download), DNS, WHOIS, subdomains, archive, TLS, email spoofing (SPF/DMARC/DKIM) |
+| Username | Footprint on all sites or a selection, results appearing live as each site answers, profile details, search links, self-audit |
+| Domain | Full report shown in the page (JSON and HTML download), or one check: DNS, WHOIS, subdomains, archive, TLS, email spoofing |
 | IP | Lookup, geolocation, VirusTotal, Shodan |
-| Web | Security headers and technologies, links, public files |
-| Email | Email address analysis |
-| File | Metadata of a file you choose (inspected locally in a temporary copy, then deleted) |
+| Web | Security headers and technologies, links on a page, public files |
+| Email | Format, MX records, role and disposable-domain flags |
+| File | Size, image format and EXIF of a file you choose, inspected locally |
 | Compare | Differences between two saved JSON reports |
 | Verify | Create a verification token and check it on your profiles |
+| History | Saved searches and reports: view, compare with the previous run or any two, delete |
 | Rules | Site-rule self-test |
 
-Each result can be exported as JSON. VirusTotal and Shodan use `VT_API_KEY` and
-`SHODAN_API_KEY` from the environment, or a key typed in the form for that request only;
-keys are never saved.
+![Domain report in the web interface](docs/images/ui-domain-report.png)
 
-Stop it with `Ctrl+C`. Use `recon ui --port 9000` for another port, `--no-browser` to
-open it yourself, and `recon --timeout 30 ui` for slow networks.
+Options: `recon ui --port 9000` for another port, `--no-browser` to open it yourself, and
+`recon --timeout 30 ui` on slow networks. VirusTotal and Shodan use `VT_API_KEY` and
+`SHODAN_API_KEY` from the environment, or a key typed into the form for that request
+only; keys are never stored.
 
-The interface listens on `127.0.0.1` only, so it is not reachable from other machines.
-Each run creates a random API token that the page sends with every request, and requests
-with a different `Host` header are refused, so other websites open in the same browser
-cannot use it. It needs no extra dependencies.
+<details>
+<summary>How the interface is protected</summary>
 
-## Usage
+- It listens on `127.0.0.1` only, so other machines cannot reach it, and it refuses to
+  share its port with another program.
+- Each run creates a random API token that the page sends with every request, and
+  requests with a different `Host` header are refused, so other websites open in the
+  same browser cannot drive the tool.
+- Text that comes from websites (titles, bios, headers) is always shown as text, never
+  as HTML, and the page's Content Security Policy only allows its own scripts.
+- It uses only the Python standard library; there is nothing extra to install.
 
-```powershell
-recon --help
-recon --version
-recon lookup example.com
-recon lookup example.com --json
-recon dns example.com
-recon footprint octocat
-recon footprint octocat --delay 0.5 --json
-python -m minimal_recon.cli email analyst@example.com --json
-python -m minimal_recon.cli web https://example.com --json
-recon metadata .\sample.jpg
-```
+</details>
 
-Every lookup command supports `--json` for scripting and pipeline integration;
-`report` prints JSON by default or writes files with `--output` and `--html`.
-Domain arguments take a bare hostname such as `example.com`, while `web`, `links`,
-`public-files` and `verify` take full `http(s)://` URLs.
-Each check has its own default timeout (3 to 15 seconds). The global `--timeout`
-option, placed before the command, replaces all of them for HTTP, DNS and TLS:
+## Command line
 
-```powershell
-recon --timeout 30 subdomains example.com
-```
+Every command supports `--help`, and most support `--json` for scripting. Domain
+arguments are bare hostnames (`example.com`); `web`, `links`, `public-files` and `verify`
+take full `https://` URLs. `--timeout SECONDS`, placed before the command, replaces the
+default HTTP, DNS and TLS timeouts.
 
-HTTP requests identify the tool with a `minimal-recon/<version>` User-Agent and do
-not imitate a browser, so some platforms answer with a challenge page.
-For `dns --json`, the response includes the raw records and a derived `summary`
-with nameservers, mail servers and conservative provider hints.
-Footprint checks use an explicit registry of 36 public sites, each with its own
-detection rule (see [Footprint](#footprint) below).
-Metadata inspection is local-only and does not upload files anywhere.
-Email analysis does not verify mailbox existence or query breach databases; it only
-checks the address format and public MX records. It also flags missing MX records,
-role-based addresses and a small built-in list of disposable email domains. These
-are heuristics, not proof that a mailbox exists or is compromised.
-Web checks make one normal HTTP request and report selected response headers; they do
-not scan ports, crawl pages or attempt to bypass access controls.
-Subdomain discovery uses public Certificate Transparency records and does not scan
-the discovered hosts.
-Reports combine the passive checks into portable JSON and HTML files with timestamps
-and source URLs. Sections run in parallel, each against its own service, and a
-failed section is recorded as an error without stopping the others. The HTML report
-shows summary cards, a table per section and the raw JSON underneath.
-Saved JSON reports can be compared later without any network access:
+| Area | Commands |
+| --- | --- |
+| Domain | `report`, `dns`, `whois`, `subdomains`, `archive`, `tls`, `anti-spoofing` |
+| IP | `lookup`, `geoip`, `reputation` (VirusTotal key), `shodan` (Shodan key) |
+| Web | `web`, `links`, `public-files` |
+| Email and files | `email`, `metadata` |
+| Username | `footprint`, `search-links` |
+| Ownership | `verify-token`, `verify` |
+| Over time | `report --save`, `watch`, `history list/show/diff/delete/clear`, `diff` |
+| Interface | `ui` |
 
 ```powershell
-recon report example.com --output monday.json
-recon report example.com --output friday.json
+recon dns example.com --json
+recon tls expired.badssl.com                   # also reports invalid certificates
+recon anti-spoofing example.com --selectors google,default
+recon web https://example.com
+recon report example.com --username octocat --details --output report.json --html report.html
 recon diff monday.json friday.json
 ```
 
-`diff` lists added (`+`), removed (`-`) and changed (`~`) values by section, such
-as new subdomains, changed DNS records or fewer days until certificate expiry.
-Run timestamps are ignored.
-WHOIS data comes from RDAP and may omit private or registry-restricted fields.
-IP geolocation is approximate and usually identifies the network, CDN or hosting
-provider rather than a precise physical location.
-Archive history uses the public Wayback CDX index and returns snapshot links; it does
-not download archived pages.
-TLS checks connect only to the requested host and port, report the negotiated protocol,
-cipher and certificate dates, and do not scan other ports. A certificate that fails
-validation (expired, self-signed, wrong host) is still reported, marked as not valid
-together with the reason. Validation trusts the system store and the Mozilla CA bundle.
-WAF detection is passive and heuristic: it uses identifying response headers only
-(not page content), so `not_detected` does not prove that a site has no WAF.
-Technology detection is also heuristic and reports only public fingerprints such as
-response headers, meta/script paths and framework markers.
-Link extraction reads one HTML page, removes fragments, separates internal and
-external HTTP(S) links, and never follows the discovered links automatically.
-Anti-spoofing checks inspect DNS records only. They flag a missing or duplicated SPF
-record, SPF that ends in `+all` or `?all` or has no terminator, and DMARC that is
-missing, duplicated, monitoring-only, partially enforced (`pct` below 100) or has no
-aggregate report address. SPF `include` chains are not followed. DKIM requires known
-selectors, which can be supplied explicitly:
+<details>
+<summary>What each check does, and does not do</summary>
+
+- **DNS** queries `A`, `AAAA`, `MX`, `NS`, `TXT` and `CNAME` and adds conservative
+  provider hints from nameservers and mail servers.
+- **WHOIS** uses RDAP, which may omit private or registry-restricted fields.
+- **Subdomains** come from public Certificate Transparency logs; the hosts are not scanned.
+- **Archive** lists Wayback Machine snapshots without downloading them.
+- **TLS** connects only to the requested host and port, and reports protocol, cipher and
+  certificate dates. Expired, self-signed or mismatched certificates are reported as not
+  valid, with the reason. Validation trusts the system store and the Mozilla CA bundle.
+- **Email spoofing** reads DNS only. It flags a missing or duplicated SPF record, SPF
+  ending in `+all` or `?all` or without a terminator, and DMARC that is missing,
+  duplicated, monitoring-only, partially enforced (`pct` below 100) or without a report
+  address. SPF `include` chains are not followed; DKIM needs known selectors.
+- **Web** makes one normal request and reports security headers. WAF and technology
+  detection are heuristic: `not_detected` does not prove there is no WAF.
+- **Links** reads one page and separates internal and external links; nothing is followed.
+- **Public files** checks only `robots.txt`, `sitemap.xml`, `security.txt` and
+  `humans.txt`; no hidden paths, backups or configuration files are requested.
+- **Email** checks the address format and public MX records and flags role and
+  disposable addresses. It does not check whether a mailbox exists or query breach data.
+- **Metadata** is local only; files are never uploaded.
+- **GeoIP** is approximate and usually identifies the network or hosting provider.
+- **Reputation and Shodan** read data those services already hold; nothing is uploaded
+  or scanned.
+- **Reports** run every section in parallel; a failed section is recorded as an error
+  without stopping the others.
+
+All HTTP requests identify the tool with a `minimal-recon/<version>` User-Agent instead
+of imitating a browser, so some sites answer with a challenge page.
+
+</details>
+
+## History and monitoring
+
+`--save` on `footprint` and `report`, and "Save to history" in the interface, keep each
+run and show what changed since the previous run of the same username or domain.
 
 ```powershell
-recon anti-spoofing example.com --selectors google,default --json
+recon report example.com --save
+recon history list
+recon history diff <id>                  # against the previous run of the same target
+recon history diff <new-id> <old-id>
 ```
 
-Public file discovery checks only a small allowlist of standard documents such as
-`robots.txt`, `sitemap.xml` and `security.txt`. It does not brute-force hidden paths
-or request sensitive files such as `.env`, backups or configuration dumps.
-Ownership verification is opt-in: generate a token, publish it temporarily on each
-profile you control, then pass those exact URLs to `verify`. It does not discover or
-link accounts automatically.
+`recon watch` repeats the report on an interval, saves every run and prints alerts for
+new subdomains, added or removed DNS records, certificates that expire within 30 days or
+are invalid, new email-spoofing findings, dropped security headers and registrar changes.
 
 ```powershell
-recon verify-token
-recon verify --token minimal-recon-verify-... --url https://github.com/your-user --url https://www.instagram.com/your-user --json
+recon watch example.com                  # every 6 hours until Ctrl+C
+recon watch example.com --interval 1d --username octocat
+recon watch example.com --once           # a single run, for Task Scheduler or cron
 ```
 
-External reputation checks use a user-provided VirusTotal API key and never upload
-files. Set it locally before running:
+<details>
+<summary>Run it daily with Windows Task Scheduler</summary>
 
 ```powershell
-$env:VT_API_KEY = "your-api-key"
-recon reputation example.com --json
-recon reputation 1.1.1.1 --json
+schtasks /Create /SC DAILY /ST 09:00 /TN "Minimal Recon example.com" `
+  /TR "\"C:\path\to\minimal-recon\.venv\Scripts\recon.exe\" watch example.com --once"
 ```
 
-Shodan lookups are also optional and require a user-provided API key:
+</details>
 
-```powershell
-$env:SHODAN_API_KEY = "your-api-key"
-recon shodan 1.1.1.1 --json
-```
+History stays on this computer, in `%LOCALAPPDATA%\minimal-recon\history` on Windows and
+`~/.local/share/minimal-recon/history` elsewhere (`MINIMAL_RECON_HOME` changes the base
+folder). `recon history clear --yes` deletes it. Changes are compared run to run, so a
+check that timed out once shows up as a change when it works again.
 
-The integration reads Shodan's existing indexed data only; it does not launch scans.
+## Username footprint
 
-## Responsible Use
-
-Only use this tool against systems, domains, files and identities you are authorized
-to investigate. The first version intentionally avoids brute force, stealth and
-access-control bypass techniques.
-
-## Footprint
-
-`footprint` checks whether a username is registered on each site in
-[`sites.json`](src/minimal_recon/data/sites.json):
+`footprint` checks whether a username is registered on each site in the bundled
+[registry](src/minimal_recon/data/sites.json):
 
 | Source | Sites | Confidence |
 | --- | --- | --- |
-| Public API | GitHub, GitLab, Codeberg, Dev.to, Hacker News, Bluesky (`*.bsky.social` handles), Keybase, Docker Hub, Lichess, Chess.com, Medium, Mastodon (mastodon.social), Gravatar, Codewars, Hugging Face, Launchpad, Wikipedia (English) | `confirmed` |
-| Public profile page | X, Instagram, TikTok, Pinterest, Twitch, Steam (custom URL), Telegram, YouTube, HackerOne, Kaggle, Pastebin, Vimeo, SoundCloud, Dribbble, Linktree, itch.io, SourceHut, Patreon, Flickr | `likely` |
+| Public API | GitHub, GitLab, Codeberg, DEV, Hacker News, Bluesky (`*.bsky.social`), Keybase, Docker Hub, Lichess, Chess.com, Medium, Mastodon, Gravatar, Codewars, Hugging Face, Launchpad, Wikipedia | `confirmed` |
+| Public profile page | X, Instagram, TikTok, Pinterest, Twitch, Steam, Telegram, YouTube, HackerOne, Kaggle, Pastebin, Vimeo, SoundCloud, Dribbble, Linktree, itch.io, SourceHut, Patreon, Flickr | `likely` |
 
 ```powershell
 recon footprint octocat
-recon footprint octocat octocat-dev octo_cat
-recon footprint octocat --found-only --details
-recon footprint octocat --site github --site gitlab --json
-recon footprint octocat --mastodon fosstodon.org --mastodon infosec.exchange
+recon footprint octocat octo-cat octo_cat --found-only
+recon footprint octocat --details --site github --site gitlab --json
+recon footprint octocat --mastodon fosstodon.org
 recon footprint --self-test
-recon footprint octocat --sites .\my-sites.json
 ```
 
-Several usernames can be checked in one run; with `--json` and more than one name the
-output is a list of `{"username": ..., "results": [...]}`. Mastodon accounts live on
-separate servers, so `--mastodon` adds servers to the default `mastodon.social` check.
-Site pages that share a path with a username (such as `vimeo.com/about`) can give a
-`likely` match that is really a site page.
+Results are `FOUND`, `NOT FOUND`, `UNKNOWN` (challenge, consent or login page),
+`RATE LIMITED`, or `N/A` when the name breaks that site's naming rules and no request
+is sent. Sites are checked in parallel, one request at a time per host.
 
-Each result has one of these states:
+**A matching username is not proof that the accounts belong to the same person.**
+Popular names are taken on most sites by different people; compare names, bios and
+photos before drawing conclusions. The tool never links accounts to each other.
 
-- `FOUND` / `NOT FOUND`: the site's rule gave a definite answer.
-- `UNKNOWN`: the site answered with a challenge, consent or login page, or with a page
-  the rule does not recognize. YouTube is always `UNKNOWN` from the EU, where it
-  redirects to a consent page first.
-- `RATE LIMITED`: the site refused because of request volume. A short `Retry-After`
-  (up to 10 seconds) is retried once. The GitHub API allows 60 unauthenticated
-  requests per hour.
-- `N/A`: the username breaks that site's naming rules (for example, a `.` on GitHub),
-  so no request is sent.
+`--details` adds what a person chose to publish on the profile: display name, bio,
+location, website, join date, public totals such as followers or posts, and accounts the
+profile itself lists (shown as self-declared, never followed). Instagram details come
+from the description it publishes for search engines. Some data is deliberately never
+collected, even when an API returns it: email addresses, phone numbers, employers,
+avatars, activity times and cross-account proofs. Profiles whose owner opted out of
+indexing (Mastodon's `noindex`) are reported without details.
 
-Sites run in parallel, one request at a time per host; `--delay` spaces requests to the
-same host. For profile pages, only the page title and meta description are kept.
+`recon search-links USERNAME` prints exact-match web searches and Wayback links for
+manual review, without sending any request.
 
-`--details` adds the fields a person chose to publish on a profile, read from the site's
-public API where the account was found: display name, bio, location, website, join date,
-public totals (followers, posts, repositories, karma and similar), and accounts the
-profile itself lists (such as an X handle on GitHub or Dev.to). Listed accounts are shown
-as self-declared and are not followed or checked. Instagram has no public API, so its
-details (display name, bio, followers, following, posts) are read from the description
-Instagram publishes on the profile page for search engines; abbreviated counts such as
-`32K` are approximate. Private accounts show only what that description shows.
-
-```powershell
-recon footprint octocat --details
-recon report example.com --username octocat --details --html audit.html
-```
-
-Some API data is deliberately not collected even when the API returns it: email
-addresses, phone numbers, employer, avatars, activity times (last online, game in
-progress) and cross-account proofs. When a profile owner has opted out of search
-indexing (Mastodon's `noindex`), the account is still reported but its details are not.
-
-`search-links` prints exact-match search links for Google, Bing and DuckDuckGo and a
-Wayback Machine history link for each possible profile, for manual review. It sends no
-requests.
-
-```powershell
-recon search-links octocat
-```
-
-### Self-audit
-
-To see what your own accounts expose, prove that you control them first:
+<details>
+<summary>Self-audit of your own accounts</summary>
 
 ```powershell
 recon verify-token
@@ -299,37 +232,27 @@ recon verify-token
 recon footprint your-name --audit-token minimal-recon-verify-...
 ```
 
-In this mode, `--details` is on, and each found profile is marked as verified when the
-token appears in its public data. Accounts declared on a verified profile (its X or
-GitHub handle) are checked one step further and marked with the profile that declared
-them. Declared accounts of profiles without the token are never followed. Opt-out flags
-do not hide details of a profile verified as yours. Remove the token from your profiles
-afterwards.
+Profiles that show the token are marked as verified, and only their declared accounts
+(X or GitHub handle) are checked one step further. Opt-out flags do not hide details of
+your own verified profiles. Remove the token afterwards.
 
-A matching username is not proof that the accounts belong to the same person. Running
-`recon footprint octocat --details` shows profiles with different names and cities
-behind the same username. The tool does not link accounts to each other; use `verify`
-when someone proves control of their profiles.
+</details>
 
-Sites change their pages without notice. `--self-test` checks every rule against a
-username known to exist and one known not to. It reports `OK`, `BROKEN` (a wrong
-definite answer, so the rule needs fixing), `INCONCLUSIVE` (no answer) or `RATE_LIMITED`.
-Reddit, npm and PyPI are not included because they block automated clients.
+<details>
+<summary>Registry format for <code>--sites</code></summary>
 
-### Footprint registry format
-
-`--sites` replaces the bundled registry with a JSON file of the same shape:
+`--sites my-sites.json` replaces the bundled registry with a file of the same shape:
 
 ```json
 {
   "sites": [
     {
       "name": "example",
+      "label": "Example",
       "url": "https://example.com/u/{username}",
       "probe_url": "https://api.example.com/users/{username_lower}",
       "source": "api",
       "username_pattern": "[A-Za-z0-9_]{3,20}",
-      "not_found_status": [404],
       "found_text": "\"login\":\"{username}\"",
       "known_present": "admin",
       "known_absent": "zq7xk2vq9wplm3"
@@ -341,6 +264,7 @@ Reddit, npm and PyPI are not included because they block automated clients.
 | Field | Meaning |
 | --- | --- |
 | `name`, `url` | Required. `url` is the public profile link shown in results. |
+| `label` | Display name, such as `Hacker News`. |
 | `probe_url` | URL actually requested, such as an API endpoint. Defaults to `url`. |
 | `source` | `api` (answers are `confirmed`) or `html` (answers are `likely`). Default `html`. |
 | `username_pattern` | Regular expression the whole username must match, otherwise `N/A`. |
@@ -349,21 +273,58 @@ Reddit, npm and PyPI are not included because they block automated clients.
 | `not_found_text`, `not_found_body` | Text in the body, or the entire body, that means `NOT FOUND`. |
 | `unknown_url` | Text in the final URL that marks a login, consent or challenge page. |
 | `known_present`, `known_absent` | Usernames used by `--self-test`. |
-| `profile_fields` | API sources only. Maps `display_name`, `bio`, `location`, `website` and `created_at` to dotted JSON paths (`them.0.profile.bio`), and `declared_accounts` and `stats` to `{label: path}`. `stats` keeps numbers only. Other field names are rejected. |
-| `meta_pattern` | HTML sources only. Regular expression for the page's public meta description; named groups `display_name`, `bio`, `location`, `website` or `stats_<label>` become `--details` fields. |
-| `opt_out_path` | API sources only. Path of the owner's "do not index" flag; when it is `true`, details are withheld. |
+| `profile_fields` | API sources only. Maps `display_name`, `bio`, `location`, `website` and `created_at` to dotted JSON paths, and `declared_accounts` and `stats` to `{label: path}`. Other fields are rejected. |
+| `meta_pattern` | HTML sources only. Regular expression for the public meta description, with named groups `display_name`, `bio`, `location`, `website` or `stats_<label>`. |
+| `opt_out_path` | API sources only. Path of the owner's "do not index" flag. |
 
 URLs and text accept `{username}` and `{username_lower}`; text is matched
-case-insensitively.
+case-insensitively. Reddit, npm and PyPI are not included because they block automated
+clients, and YouTube is `UNKNOWN` from the EU because of its consent page.
+
+</details>
+
+## Responsible use
+
+Use Minimal Recon only on systems, domains, files and identities you are authorized to
+investigate, or on your own accounts. It intentionally leaves out brute force, stealth,
+access-control bypass and the collection of personal contact or location data.
+
+## Project structure
+
+```text
+src/minimal_recon/
+  cli.py              builds the `recon` command from the modules below
+  commands/           command definitions: checks, footprint, reports and history
+  services/           one module per check, with no CLI code; history, diff and report
+  data/sites.json     footprint site registry
+  ui/                 local web server (standard library) and static page
+tests/                pytest suite; network calls are replaced with fakes
+```
+
+Services take an optional `httpx.Client` or DNS resolver so they can be tested without
+network access. The CLI uses Typer for type-hint based commands and generated help.
+
+## Development
+
+```powershell
+python -m pip install -e ".[dev]"
+python -m pytest
+python -m ruff check .
+python -m mypy
+```
+
+To release, update `__version__` in `src/minimal_recon/__init__.py`, move the
+`Unreleased` notes in [CHANGELOG.md](CHANGELOG.md) under the new version, and push a tag
+such as `v0.2.0`. The release workflow checks that the tag matches the version, runs the
+checks, builds the wheel and source archive, and publishes a GitHub release with the
+changelog notes.
 
 ## Roadmap
 
-1. Add scheduled monitoring on top of `diff`.
-2. Add packaging and release automation.
+1. DNSSEC, CAA, MTA-STS and certificate SAN checks.
+2. Optional `GITHUB_TOKEN` and a short-lived cache to reduce rate limiting.
+3. Publishing to PyPI.
 
-## Why Typer?
+## License
 
-Typer is a good fit here because it provides modern type-hint-based command definitions,
-help generation and shell-friendly errors while keeping each CLI command thin. It is
-less verbose than `argparse`, and the project can add nested command groups later
-without losing a clean service layer.
+[MIT](LICENSE)

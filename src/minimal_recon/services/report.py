@@ -121,7 +121,10 @@ def render_html(report: Dict[str, Any]) -> str:
 _STYLE = "".join(
     (
         ":root{color-scheme:dark;--bg:#0b1120;--panel:#111827;--line:#263244;--text:#e5edf7;",
-        "--muted:#91a0b5;--accent:#67e8f9;--good:#86efac;--warn:#fde68a;--bad:#fca5a5}",
+        "--muted:#91a0b5;--accent:#67e8f9;--good:#86efac;--warn:#fde68a;--bad:#fca5a5;--code:#cbd5e1}",
+        "@media(prefers-color-scheme:light){:root{color-scheme:light;--bg:#f5f7fa;--panel:#ffffff;",
+        "--line:#dde3ea;--text:#17202b;--muted:#5d6b7c;--accent:#0f6cbd;--good:#137a3e;--warn:#8a5a00;",
+        "--bad:#b42318;--code:#334155}}",
         "*{box-sizing:border-box}",
         "body{margin:0;background:var(--bg);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif}",
         ".wrap{max-width:1180px;margin:0 auto;padding:36px 20px 64px}",
@@ -132,7 +135,7 @@ _STYLE = "".join(
         ".card{padding:16px}.card strong{display:block;font-size:24px;color:var(--accent)}",
         ".card span{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}",
         ".panel{padding:20px;margin:14px 0}",
-        ".panel pre{margin:0;white-space:pre-wrap;overflow:auto;color:#cbd5e1;line-height:1.55;",
+        ".panel pre{margin:0;white-space:pre-wrap;overflow:auto;color:var(--code);line-height:1.55;",
         "font:13px ui-monospace,SFMono-Regular,Consolas,monospace}",
         ".scroll{max-height:460px;overflow:auto}",
         "table{border-collapse:collapse;width:100%;font-size:14px}",
@@ -149,8 +152,19 @@ _STYLE = "".join(
 )
 
 
+SECTION_TITLES = {
+    "dns": "DNS",
+    "whois": "WHOIS",
+    "tls": "TLS",
+    "geoip": "IP geolocation",
+    "anti_spoofing": "Email spoofing",
+    "public_files": "Public files",
+    "username_footprint": "Username footprint",
+}
+
+
 def _section_title(name: str) -> str:
-    return name.replace("_", " ").title()
+    return SECTION_TITLES.get(name, name.replace("_", " ").capitalize())
 
 
 def _summary_cards(report: Dict[str, Any]) -> str:
@@ -189,7 +203,7 @@ def _card_metric(name: str, value: Any) -> "tuple[str, str]":
         return f"{days} days", "warn" if days < 30 else "good"
     if name == "anti_spoofing":
         findings = len(value.get("findings") or [])
-        return (f"{findings} findings", "warn") if findings else ("OK", "good")
+        return (f"{findings} finding{'s' if findings != 1 else ''}", "warn") if findings else ("OK", "good")
     if name == "web":
         missing = len(value.get("missing_security_headers") or [])
         return (f"{missing} missing", "warn") if missing else ("OK", "good")

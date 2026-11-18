@@ -43,7 +43,8 @@ const TOOL_TABS = [
         id: "report", label: "Full report", special: "report",
         about: "Runs every passive domain check at once and builds the visual report.",
         fields: [F.domain, { name: "username", label: "Username (optional)", placeholder: "octocat", optional: true },
-          { name: "details", label: "Profile details for the username", type: "checkbox" }],
+          { name: "details", label: "Profile details for the username", type: "checkbox" },
+          { name: "save", label: "Save to history", type: "checkbox", value: true }],
       },
       { id: "dns", label: "DNS", about: "A, AAAA, MX, NS, TXT and CNAME records with provider hints.", fields: [F.domain] },
       { id: "whois", label: "WHOIS", about: "Registrar, dates and nameservers from RDAP.", fields: [F.domain] },
@@ -196,6 +197,11 @@ function fileName(text) {
   return text.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 80) || "result";
 }
 
+/** Replace a node's children, skipping null or undefined entries. */
+function fill(node, ...children) {
+  node.replaceChildren(...children.filter((child) => child !== null && child !== undefined));
+}
+
 /** Render any JSON value as nested tables and lists, text only. */
 function renderValue(value) {
   if (value === null || value === undefined || value === "") return el("span", { className: "muted", text: "-" });
@@ -239,6 +245,7 @@ function activateTab(name) {
     tab.setAttribute("aria-selected", String(active));
     $(`tab-${tab.dataset.tab}`).classList.toggle("hidden", !active);
   }
+  if (name === "history") loadHistory();
 }
 
 $("tabs").addEventListener("click", (event) => {
@@ -249,13 +256,13 @@ $("tabs").addEventListener("click", (event) => {
 /* ---------- generic tool panels ---------- */
 
 function buildToolPanels() {
-  const rulesTab = document.querySelector('.tab[data-tab="rules"]');
-  const rulesPanel = $("tab-rules");
+  const historyTab = document.querySelector('.tab[data-tab="history"]');
+  const historyPanel = $("tab-history");
   for (const group of TOOL_TABS) {
-    rulesTab.before(el("button", {
+    historyTab.before(el("button", {
       className: "tab", text: group.label, attrs: { role: "tab", "aria-selected": "false", "data-tab": group.id },
     }));
-    rulesPanel.before(buildPanel(group));
+    historyPanel.before(buildPanel(group));
   }
 }
 
@@ -328,7 +335,7 @@ function buildPanel(group) {
 function fieldControl(field, values) {
   if (field.type === "checkbox") {
     const box = el("input", { attrs: { type: "checkbox", name: field.name } });
-    box.checked = Boolean(values[field.name]);
+    box.checked = Boolean(values[field.name] ?? field.value ?? false);
     box.addEventListener("change", () => { values[field.name] = box.checked; });
     return el("label", { className: "check" }, [box, ` ${field.label}`]);
   }
@@ -405,7 +412,79 @@ function showReport(output, data) {
     attrs: { title: "Report", sandbox: "allow-popups allow-popups-to-escape-sandbox" },
   });
   frame.srcdoc = data.html;
-  output.replaceChildren(el("div", { className: "run-actions" }, [jsonButton, htmlButton]), frame);
+  fill(output,
+    el("div", { className: "run-actions" }, [jsonButton, htmlButton]),
+    data.history ? changesBanner(data.history, "domain") : null,
+    frame,
+  );
+}
+
+/* ---------- history: shared rendering ---------- */
+
+function formatDate(iso) {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
+}
+
+function compact(value) {
+  if (value === null || value === undefined) return "-";
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  return text.length > 300 ? `${text.slice(0, 300)}...` : text;
+}
+
+/** "N changes since <date>" with an inline, on-demand list of the changes. */
+function changesBanner(info, noun) {
+  if (!info.previous_id) {
+    return el("div", { className: "banner" }, el("span", {
+      text: `Saved to history. This is the first saved run for this ${noun}; next time you will see what changed.`,
+    }));
+  }
+  const box = el("div", { className: "hidden" });
+  const button = el("button", { text: "Show changes", attrs: { type: "button" } });
+  button.disabled = !info.changes;
+  button.addEventListener("click", async () => {
+    if (!box.classList.contains("hidden")) {
+      box.classList.add("hidden");
+      button.textContent = "Show changes";
+      return;
+    }
+    box.classList.remove("hidden");
+    button.textContent = "Hide changes";
+    if (box.childElementCount) return;
+    try {
+      box.append(changesView(await api("/api/history/compare", { old_id: info.previous_id, new_id: info.id })));
+    } catch (error) {
+      box.append(el("p", { className: "error", text: error.message }));
+    }
+  });
+  const label = info.changes
+    ? `${info.changes} change(s) since the last run on ${formatDate(info.previous_at)}.`
+    : `No changes since the last run on ${formatDate(info.previous_at)}.`;
+  return el("div", { className: `banner ${info.changes ? "changed" : ""}` }, [
+    el("div", { className: "banner-row" }, [el("span", { text: label }), info.changes ? button : null]),
+    box,
+  ]);
+}
+
+function changesView(comparison) {
+  const parts = [];
+  if (comparison.alerts && comparison.alerts.length) {
+    parts.push(el("ul", { className: "alerts" }, comparison.alerts.map((alert) => el("li", { text: alert }))));
+  }
+  if (!comparison.changes.length) {
+    parts.push(el("p", { className: "muted", text: "No changes." }));
+  } else {
+    parts.push(el("div", { className: "scroll" }, el("table", { className: "table" }, [
+      el("thead", {}, el("tr", {}, ["Change", "Where", "Before", "After"].map((h) => el("th", { text: h })))),
+      el("tbody", {}, comparison.changes.map((change) => el("tr", {}, [
+        el("td", {}, el("span", { className: `pill change-${change.change}`, text: change.change })),
+        el("td", { className: "mono", text: change.path }),
+        el("td", { text: change.change === "added" ? "" : compact(change.old) }),
+        el("td", { text: change.change === "removed" ? "" : compact(change.new) }),
+      ]))),
+    ])));
+  }
+  return el("div", { className: "changes" }, parts);
 }
 
 /* ---------- username: site picker ---------- */
@@ -431,7 +510,7 @@ async function loadSites() {
       const box = el("input", { attrs: { type: "checkbox", value: site.name } });
       box.checked = true;
       box.addEventListener("change", updateSitesCount);
-      grid.append(el("label", { className: "check" }, [box, ` ${site.name}`]));
+      grid.append(el("label", { className: "check" }, [box, ` ${site.label}`]));
     }
     updateSitesCount();
   } catch (error) {
@@ -461,16 +540,17 @@ function profileList(result) {
   for (const [name, value] of Object.entries(result.profile || {})) {
     if (name === "stats") continue;
     if (name === "website") add(PROFILE_LABELS[name], safeLink(value));
+    else if (name === "created_at") add(PROFILE_LABELS[name], el("span", { text: formatDay(value) }));
     else if (value && typeof value === "object") {
       add(PROFILE_LABELS[name] || name, el("span", {
         text: Object.entries(value).map(([label, item]) => `${label}: ${item}`).join(", "),
       }));
-    } else add(PROFILE_LABELS[name] || name, el("span", { text: value }));
+    } else add(PROFILE_LABELS[name] || name, clampedText(value));
   }
   if (!result.profile || !result.profile.display_name) {
-    if (result.page_title) add("Page title", el("span", { text: result.page_title }));
+    if (result.page_title) add("Page title", clampedText(result.page_title, 2));
     if (result.meta_description && !result.profile?.bio) {
-      add("Description", el("span", { text: result.meta_description }));
+      add("Description", clampedText(result.meta_description));
     }
   }
   if (result.profile_note) add("Details", el("span", { className: "muted", text: result.profile_note }));
@@ -487,9 +567,28 @@ function statsRow(stats) {
       ])));
 }
 
+/** Long remote text, cut to a few lines; the full text is in the tooltip. */
+function clampedText(value, lines = 4) {
+  const text = String(value);
+  return el("span", { className: `clamp clamp-${lines}`, text, attrs: { title: text } });
+}
+
+function formatDay(value) {
+  const date = new Date(value);
+  if (!/^\d{4}-\d{2}-\d{2}/.test(String(value)) || Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function siteLabel(name) {
+  const site = allSites.find((item) => item.name === name);
+  if (site) return site.label;
+  const mastodon = /^mastodon@(.+)$/.exec(name);
+  return mastodon ? `Mastodon (${mastodon[1]})` : name;
+}
+
 function resultCard(result) {
   const head = el("div", { className: "card-head" }, [
-    el("span", { className: "site", text: result.site }),
+    el("span", { className: "site", text: siteLabel(result.site) }),
     el("span", { className: `pill ${result.state}`, text: STATE_LABELS[result.state] || result.state }),
     result.confidence ? el("span", { className: `confidence ${result.confidence}`, text: result.confidence }) : null,
   ]);
@@ -516,9 +615,10 @@ function summaryBar(results) {
   return el("div", { className: "summary" }, [
     ["found", "Found"], ["not_found", "Not found"], ["unknown", "Unknown"],
     ["rate_limited", "Rate limited"], ["not_applicable", "N/A"],
-  ].map(([state, label]) => el("span", { className: `count ${state}` }, [
-    el("strong", { text: count(state) }), el("span", { text: ` ${label}` }),
-  ])));
+  ].filter(([state]) => state === "found" || count(state) > 0)
+    .map(([state, label]) => el("span", { className: `count ${state}` }, [
+      el("strong", { text: count(state) }), el("span", { text: ` ${label}` }),
+    ])));
 }
 
 function renderRuns() {
@@ -534,19 +634,64 @@ function renderRuns() {
     exportButton.addEventListener("click", () =>
       download(`footprint-${fileName(run.username)}.json`, JSON.stringify(run, null, 2), "application/json"));
 
+    const running = !run.done;
+    exportButton.disabled = running;
+    let emptyText = null;
+    if (!visible.length) {
+      if (running) emptyText = "Waiting for the first profile...";
+      else if (run.error) emptyText = null;
+      else emptyText = foundOnly ? "Not found on any checked site." : "No results.";
+    }
     container.append(el("section", { className: "run" }, [
       el("div", { className: "run-head" }, [
         el("h2", { text: run.username }),
         el("div", { className: "run-actions" }, [linksButton, exportButton]),
       ]),
+      running ? progressBar(run.results.length, run.total) : null,
       summaryBar(run.results),
+      run.error ? el("p", { className: "error", text: run.error }) : null,
+      run.history ? changesBanner(run.history, "username") : null,
       linksBox,
       el("div", { className: "grid" }, visible.map(resultCard)),
-      visible.length ? null : el("p", {
-        className: "muted",
-        text: foundOnly ? "Not found on any checked site." : "No results.",
-      }),
+      emptyText ? el("p", { className: "muted", text: emptyText }) : null,
     ]));
+  }
+}
+
+function progressBar(done, total) {
+  const bar = el("progress", { attrs: { max: String(total || 1), value: String(done) } });
+  return el("div", { className: "progress" }, [bar, el("span", { className: "muted small", text: `${done} / ${total} sites` })]);
+}
+
+/** POST and read newline-delimited JSON events as they arrive. */
+async function streamApi(path, payload, onEvent) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Recon-Token": TOKEN },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let data = {};
+    try {
+      data = await response.json();
+    } catch {
+      /* handled below */
+    }
+    throw new Error(data.error || `request failed (HTTP ${response.status})`);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    let newline;
+    while ((newline = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, newline).trim();
+      buffer = buffer.slice(newline + 1);
+      if (line) onEvent(JSON.parse(line));
+    }
+    if (done) break;
   }
 }
 
@@ -588,20 +733,34 @@ $("footprint-form").addEventListener("submit", async (event) => {
   const submit = $("footprint-submit");
   submit.disabled = true;
   $("footprint-empty").classList.add("hidden");
+  lastRuns = [];
+  renderRuns();
   const stop = startTimer(status, "Checking sites...");
+  const runFor = (username) => lastRuns.find((run) => run.username === username);
   try {
-    const data = await api("/api/footprint", {
+    await streamApi("/api/footprint/stream", {
       usernames: $("usernames").value,
       details: $("opt-details").checked,
       sites: sites.length === allSites.length ? [] : sites,
       mastodon: $("opt-mastodon").value,
       audit_token: $("opt-audit").value.trim(),
+      save: $("opt-save").checked,
+    }, (event) => {
+      if (event.type === "start") {
+        lastRuns.push({ username: event.username, total: event.total, results: [], done: false, history: null });
+      } else if (event.type === "result") {
+        runFor(event.username)?.results.push(event.result);
+      } else if (event.type === "done") {
+        Object.assign(runFor(event.username), { results: event.results, done: true, history: event.history || null });
+      } else if (event.type === "error") {
+        const run = runFor(event.username);
+        if (run) Object.assign(run, { done: true, error: event.error });
+      }
+      if (event.type !== "end") renderRuns();
     });
-    lastRuns = data.runs;
     stop();
     const found = lastRuns.reduce((total, run) => total + run.results.filter((r) => r.found).length, 0);
     setStatus(status, `Done. ${found} profile(s) found.`, "ok");
-    renderRuns();
   } catch (error) {
     stop();
     setStatus(status, error.message, "error");
@@ -623,7 +782,7 @@ $("selftest-run").addEventListener("click", async () => {
     const broken = data.rules.filter((rule) => rule.status === "broken").length;
     setStatus(status, `${data.rules.length - broken} of ${data.rules.length} rules not broken.`, broken ? "error" : "ok");
     const rows = data.rules.map((rule) => el("tr", {}, [
-      el("td", { text: rule.site }),
+      el("td", { text: siteLabel(rule.site) }),
       el("td", {}, el("span", { className: `pill rule-${rule.status}`, text: rule.status })),
       el("td", { text: rule.present ?? "-" }),
       el("td", { text: rule.absent ?? "-" }),
@@ -638,6 +797,133 @@ $("selftest-run").addEventListener("click", async () => {
   } finally {
     button.disabled = false;
   }
+});
+
+/* ---------- history tab ---------- */
+
+const KIND_LABELS = { footprint: "Username", report: "Domain report" };
+
+function summaryText(entry) {
+  const summary = entry.summary || {};
+  if (entry.kind === "footprint") {
+    const sites = (summary.found_sites || []).map(siteLabel).join(", ");
+    return `Found on ${summary.found ?? 0} of ${summary.checked ?? 0}${sites ? `: ${sites}` : ""}`;
+  }
+  const parts = [];
+  if (summary.subdomains !== undefined) parts.push(`${summary.subdomains} subdomains`);
+  if (summary.tls_days !== undefined && summary.tls_days !== null) parts.push(`TLS ${summary.tls_days} days`);
+  if (summary.errors && summary.errors.length) parts.push(`errors: ${summary.errors.join(", ")}`);
+  return parts.join(" · ") || "-";
+}
+
+function selectedHistoryIds() {
+  return [...document.querySelectorAll("#history-list input[type=checkbox]:checked")].map((box) => box.value);
+}
+
+function updateCompareButton() {
+  $("history-compare").disabled = selectedHistoryIds().length !== 2;
+}
+
+async function loadHistory() {
+  const status = $("history-status");
+  try {
+    const data = await api("/api/history/list", { kind: $("history-kind").value, target: $("history-target").value });
+    $("history-folder").textContent = `Saved only on this computer, in ${data.folder}`;
+    setStatus(status, data.entries.length ? "" : "No saved runs yet. Searches and reports are saved when "
+      + "\"Save to history\" is ticked.");
+    if (!data.entries.length) {
+      $("history-list").replaceChildren();
+      return;
+    }
+    const rows = data.entries.map((entry) => {
+      const box = el("input", { attrs: { type: "checkbox", value: entry.id, "aria-label": "Select for comparison" } });
+      box.addEventListener("change", updateCompareButton);
+      const view = el("button", { text: "View", attrs: { type: "button" } });
+      const previous = el("button", { text: "vs previous", attrs: { type: "button" } });
+      const remove = el("button", { text: "Delete", attrs: { type: "button" }, className: "danger" });
+      view.addEventListener("click", () => showHistoryEntry(entry.id));
+      previous.addEventListener("click", () => showComparison({ new_id: entry.id }));
+      remove.addEventListener("click", async () => {
+        if (!window.confirm(`Delete the saved run for ${entry.target} from ${formatDate(entry.created_at)}?`)) return;
+        try {
+          await api("/api/history/delete", { id: entry.id });
+          $("history-output").replaceChildren();
+          loadHistory();
+        } catch (error) {
+          setStatus(status, error.message, "error");
+        }
+      });
+      return el("tr", {}, [
+        el("td", {}, box),
+        el("td", { className: "nowrap", text: formatDate(entry.created_at) }),
+        el("td", { text: KIND_LABELS[entry.kind] || entry.kind }),
+        el("td", { className: "strong nowrap", text: entry.target }),
+        el("td", { className: "muted", text: summaryText(entry) }),
+        el("td", {}, el("div", { className: "row-actions" }, [view, previous, remove])),
+      ]);
+    });
+    $("history-list").replaceChildren(el("div", { className: "scroll" }, el("table", { className: "table" }, [
+      el("thead", {}, el("tr", {}, ["", "Date", "Kind", "Target", "Summary", ""].map((h) => el("th", { text: h })))),
+      el("tbody", {}, rows),
+    ])));
+    updateCompareButton();
+  } catch (error) {
+    setStatus(status, error.message, "error");
+  }
+}
+
+async function showHistoryEntry(id) {
+  const output = $("history-output");
+  try {
+    const data = await api("/api/history/get", { id });
+    const heading = el("h2", { text: `${data.entry.target} · ${formatDate(data.entry.created_at)}` });
+    if (data.entry.kind === "report") {
+      const frame = el("iframe", {
+        className: "report-frame",
+        attrs: { title: "Saved report", sandbox: "allow-popups allow-popups-to-escape-sandbox" },
+      });
+      frame.srcdoc = data.html;
+      output.replaceChildren(heading, frame);
+    } else {
+      const results = data.data.results || [];
+      const found = results.filter((result) => result.found);
+      fill(output, heading, summaryBar(results),
+        el("div", { className: "grid" }, found.map(resultCard)),
+        found.length ? null : el("p", { className: "muted", text: "Not found on any checked site." }));
+    }
+    output.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (error) {
+    setStatus($("history-status"), error.message, "error");
+  }
+}
+
+async function showComparison(ids) {
+  const output = $("history-output");
+  try {
+    const comparison = await api("/api/history/compare", ids);
+    fill(output,
+      el("h2", { text: `${comparison.new.target}: ${formatDate(comparison.old.created_at)} → `
+        + `${formatDate(comparison.new.created_at)}` }),
+      comparison.changes.length
+        ? el("p", { className: "muted", text: `${comparison.changes.length} change(s).` })
+        : null,
+      changesView(comparison),
+    );
+    output.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (error) {
+    setStatus($("history-status"), error.message, "error");
+  }
+}
+
+$("history-refresh").addEventListener("click", loadHistory);
+$("history-kind").addEventListener("change", loadHistory);
+$("history-target").addEventListener("input", () => {
+  clearTimeout(loadHistory.timer);
+  loadHistory.timer = setTimeout(loadHistory, 300);
+});
+$("history-compare").addEventListener("click", () => {
+  const [newer, older] = selectedHistoryIds();  // the list is newest first
+  showComparison({ old_id: older, new_id: newer });
 });
 
 buildToolPanels();

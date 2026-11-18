@@ -3,6 +3,7 @@ import pytest
 from typer.testing import CliRunner
 
 from minimal_recon import cli
+from minimal_recon.commands import checks
 from minimal_recon.services import http
 from minimal_recon.services.web import WebCheckResult
 
@@ -48,7 +49,7 @@ def test_cli_timeout_option_applies_to_the_command_and_resets(monkeypatch):
         seen.append(http.resolve_timeout(5))
         return WebCheckResult(url, url, 200, {}, (), None, (), "not_detected", {})
 
-    monkeypatch.setattr(cli, "check_web", fake_check_web)
+    monkeypatch.setattr(checks, "check_web", fake_check_web)
 
     with_option = runner.invoke(cli.app, ["--timeout", "30", "web", "https://example.test"])
     without_option = runner.invoke(cli.app, ["web", "https://example.test"])

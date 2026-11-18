@@ -455,3 +455,21 @@ def test_html_details_come_from_meta_description():
 def test_meta_pattern_is_restricted(options, message):
     with pytest.raises(ValueError, match=message):
         SiteRule(name="s", url="https://s.test/{username}", **options)
+
+
+def test_page_title_ignores_icon_titles_and_later_titles():
+    page = (
+        "<html><head><title>GitHub (@github) / X</title></head><body>"
+        "<svg><title>Pinterest icon</title></svg><title>second</title></body></html>"
+    )
+
+    assert summarize_public_page(page)[0] == "GitHub (@github) / X"
+
+
+def test_svg_title_before_document_title_is_skipped():
+    assert summarize_public_page("<svg><title>icon</title></svg><title>Profile</title>")[0] == "Profile"
+
+
+def test_every_bundled_site_has_a_display_label():
+    assert all(rule.label for rule in SITES.values())
+    assert footprint.mastodon_rule("fosstodon.org").label == "Mastodon (fosstodon.org)"
